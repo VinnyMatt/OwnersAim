@@ -341,6 +341,13 @@ footer.privacy {
       <h2>Debts</h2>
       <p class="cardnote">Each debt amortises from its own interest rate and payment. What-if events that add borrowing (e.g. a new mortgage) appear here automatically.</p>
       <div class="tablewrap" id="debt-summary"></div>
+      <p class="cardnote" id="debt-offset-note" style="margin-top:8px">The <strong>Offset savings</strong> control links cash to a mortgage: the offset slice earns no interest (and none is taxed), and mortgage interest is only charged on the balance above it.</p>
+    </div>
+    <div class="card">
+      <h3>Overpayment calculator</h3>
+      <p class="cardnote">See what paying extra each month does to a debt, then add it to the plan as a what-if with one click. (Standalone illustration at today's payment and rate; the what-if event applies it through the full plan, including any offset.)</p>
+      <div class="controls" id="op-controls"></div>
+      <div id="op-result"></div>
     </div>
     <div class="card">
       <h3>Outstanding balances over time</h3>
@@ -655,6 +662,16 @@ const EVENT_TEMPLATES = {
     ],
     describe: (p, d) => `${fmtGBP(p.annual)}/yr extra into ${assetName(d, p.assetId)}, age ${p.fromAge}–${p.toAge}`,
   },
+  mortgageOverpay: {
+    name: "Mortgage overpayment", group: "Property & purchases",
+    desc: "Pay extra each month off a debt and clear it sooner.",
+    fields: [
+      { key: "liabilityId", label: "Debt", type: "liability" },
+      { key: "year", label: "Starts (plan year)", type: "year" },
+      { key: "monthly", label: "Extra per month", type: "number", def: 200 },
+    ],
+    describe: (p, d) => `${fmtGBP((p.monthly || 0) * 12)}/yr extra off ${liabilityName(d, p.liabilityId)}`,
+  },
   buyProperty: {
     name: "Buy a property", group: "Property & purchases",
     desc: "New property with a deposit taken from savings and an optional mortgage.",
@@ -770,6 +787,7 @@ const EVENT_TEMPLATES = {
 function personName(d, id) { const p = d.people.find((x) => x.id === id); return p ? p.name.split(" ")[0] : id; }
 function incomeName(d, id) { const i = d.incomes.find((x) => x.id === id); return i ? i.name : id; }
 function assetName(d, id) { const a = d.assets.find((x) => x.id === id); return a ? a.name : id; }
+function liabilityName(d, id) { const l = (d.liabilities || []).find((x) => x.id === id); return l ? l.name : id; }
 
 /* Compile enabled events into modifiers the engine consumes. */
 function compileEvents(d, events) {
@@ -785,6 +803,7 @@ function compileEvents(d, events) {
     newAssets: [],                        // {yearIdx, asset, liability}
     sellAsset: [],                        // {assetId, yearIdx, newHomePrice, costs}
     extraIncome: [],                      // {name, yearFrom, yearTo, annualToday, taxable, ownerId}
+    debtOverpay: [],                      // {liabilityId, fromYear, annual}
   };
   const yearOfAge = (personId, age) => {
     const p = d.people.find((x) => x.id === personId);
@@ -799,6 +818,7 @@ function compileEvents(d, events) {
     const p = ev.params || {};
     switch (ev.template) {
       case "retireEarly": m.retirementAge[p.personId] = p.newRetirementAge; break;
+      case "mortgageOverpay": m.debtOverpay.push({ liabilityId: p.liabilityId, fromYear: p.year || 0, annual: (p.monthly || 0) * 12 }); break;
       case "salaryChange": m.incomeSets.push({ incomeId: p.incomeId, fromYear: ownerYear(p.incomeId, p.fromAge), annualToday: p.newAnnual }); break;
       case "careerBreak": m.incomeStops.push({ incomeId: p.incomeId, fromYear: ownerYear(p.incomeId, p.fromAge), toYear: ownerYear(p.incomeId, p.fromAge) + p.years - 1 }); break;
       case "newPension": {
@@ -911,6 +931,22 @@ function runProjection(d, events) {
       }
     }
 
+    // ── offset mortgages: linked cash offsets debt interest instead of earning interest ──
+    const assetOffset = {}, liabOffset = {};
+    for (const l of liabs) {
+      if (!l.offsetAssetIds || !l.offsetAssetIds.length || l.bal <= 0) continue;
+      let room = l.bal;
+      for (const aid of l.offsetAssetIds) {
+        if (room <= 0) break;
+        const a = assets.find((x) => x.id === aid && x.bal > 0);
+        if (!a) continue;
+        const avail = Math.max(0, a.bal - (assetOffset[a.id] || 0));
+        const take = Math.min(avail, room);
+        if (take > 0) { assetOffset[a.id] = (assetOffset[a.id] || 0) + take; room -= take; }
+      }
+      liabOffset[l.id] = l.bal - room;
+    }
+
     // ── incomes per person ──
     const perPerson = {};
     const incomeItems = []; // {name, ownerId, amount, kind, slot}
@@ -980,7 +1016,7 @@ function runProjection(d, events) {
     // cash interest → savings income (owner, joint split)
     for (const a of assets) {
       if (a.type !== "cash" || a.bal <= 0) continue;
-      const interest = a.bal * assetGrowthFor(a, i);
+      const interest = Math.max(0, a.bal - (assetOffset[a.id] || 0)) * assetGrowthFor(a, i);
       shareOwners(d, a.ownerId, alive).forEach(([pid, share]) => { perPerson[pid].savings += interest * share; });
     }
 
@@ -1059,16 +1095,18 @@ function runProjection(d, events) {
     let debtPay = 0, debtInterest = 0;
     for (const l of liabs) {
       if (l.bal <= 0) continue;
-      const interest = l.bal * (l.interestRate || 0);
-      const pay = Math.min(l.bal + interest, l.annualPayment || 0);
+      const interest = Math.max(0, l.bal - (liabOffset[l.id] || 0)) * (l.interestRate || 0);
+      let overpay = 0;
+      for (const op of mods.debtOverpay) if (op.liabilityId === l.id && i >= op.fromYear) overpay += op.annual;
+      const pay = Math.min(l.bal + interest, (l.annualPayment || 0) + overpay);
       l.bal = Math.max(0, l.bal + interest - pay);
       debtPay += pay; debtInterest += interest;
     }
 
-    // ── asset growth (non-cash growth; cash interest added here too) ──
+    // ── asset growth (non-cash growth; cash interest added here too; offset cash earns nothing on the offset slice) ──
     for (const a of assets) {
       if (a.bal <= 0) continue;
-      a.bal *= 1 + assetGrowthFor(a, i);
+      a.bal += Math.max(0, a.bal - (assetOffset[a.id] || 0)) * assetGrowthFor(a, i);
     }
 
     // ── planned contributions into non-pension assets ──
@@ -1214,7 +1252,7 @@ function runProjection(d, events) {
       pensionContribTotal, employerContribTotal, plannedSavings,
       incomeItems, withdrawals, lumpIn, lumpOut, lumpNames: [...cbLumpNames],
       shortfall, surplusSaved: surplusTotal,
-      assets: assetBals, assetTotal, liabs: liabBals, liabTotal, netWorth: assetTotal - liabTotal,
+      assets: assetBals, assetTotal, liabs: liabBals, liabTotal, offsets: liabOffset, netWorth: assetTotal - liabTotal,
       inflFactor: infl,
     });
   }
@@ -1925,6 +1963,10 @@ function openEventForm(templateKey, existing) {
       inp = el("select");
       d.incomes.forEach((x) => inp.append(el("option", { value: x.id }, x.name)));
       if (cur) inp.value = cur;
+    } else if (f.type === "liability") {
+      inp = el("select");
+      (d.liabilities || []).forEach((l) => inp.append(el("option", { value: l.id }, l.name)));
+      if (cur) inp.value = cur;
     } else if (f.type && f.type.startsWith("asset")) {
       const wantType = f.type.split(":")[1];
       inp = el("select");
@@ -1955,7 +1997,7 @@ function openEventForm(templateKey, existing) {
   save.addEventListener("click", () => {
     const p = {};
     for (const [key, { inp, f }] of Object.entries(inputs)) {
-      if (f.type === "text" || f.type === "select" || f.type === "person" || f.type === "income" || (f.type || "").startsWith("asset")) p[key] = inp.value;
+      if (f.type === "text" || f.type === "select" || f.type === "person" || f.type === "income" || f.type === "liability" || (f.type || "").startsWith("asset")) p[key] = inp.value;
       else p[key] = parseFloat(inp.value) || 0;
     }
     if (existing) { existing.params = p; existing.name = nameField.value || tmpl.name; existing.template = templateKey; }
@@ -2053,6 +2095,8 @@ function renderDebts() {
     summary.append(el("p", { class: "cardnote" }, "No debts — nothing borrowed in this plan."));
     $("#debt-chart").textContent = "";
     $("#debt-table").textContent = "";
+    $("#op-controls").textContent = "";
+    $("#op-result").textContent = "";
     return;
   }
 
@@ -2078,30 +2122,61 @@ function renderDebts() {
     return seen ? "beyond plan end" : "—";
   };
 
+  const offsets0 = rows[0].offsets || {};
+  const cashAssets = state.data.assets.filter((a) => a.type === "cash");
+  const interestOf = (m) => {
+    const bal = m.balance != null ? m.balance : (rows[0].liabs || {})[m.id] || 0;
+    return Math.max(0, bal - (offsets0[m.id] || 0)) * (m.rate || 0);
+  };
   const tbl = el("table", { class: "data" });
   tbl.append(el("thead", null, el("tr", null,
-    ...["Debt", "Interest rate", "Monthly payment", "Balance today", "Interest this year", "Repaid in"].map((h) => el("th", null, h)))));
+    ...["Debt", "Interest rate", "Monthly payment", "Balance today", "Offset savings", "Interest this year", "Repaid in"].map((h) => el("th", null, h)))));
   const tb = el("tbody");
   for (const m of meta) {
     const bal0 = (rows[0].liabs || {})[m.id] || m.balance || 0;
     const nameCell = el("td", null);
     nameCell.append(el("span", { class: "swatch", style: `background:var(--s${m.slot})` }), m.name);
+
+    // offset control — only for debts defined in the data (not what-if debts)
+    const liab = (state.data.liabilities || []).find((l) => l.id === m.id);
+    let offsetCell;
+    if (liab && liab.type === "mortgage" && cashAssets.length) {
+      const sel = el("select");
+      sel.append(el("option", { value: "" }, "None"));
+      for (const a of cashAssets) sel.append(el("option", { value: a.id }, a.name));
+      if (cashAssets.length > 1) sel.append(el("option", { value: "*all*" }, "All cash accounts"));
+      const cur = liab.offsetAssetIds || [];
+      sel.value = cur.length === 0 ? "" : cur.length > 1 ? "*all*" : cur[0];
+      sel.addEventListener("change", () => {
+        liab.offsetAssetIds = sel.value === "" ? [] : sel.value === "*all*" ? cashAssets.map((a) => a.id) : [sel.value];
+        recompute();
+      });
+      offsetCell = el("td", null, sel);
+      if (offsets0[m.id] > 0.5) offsetCell.append(el("div", { class: "cardnote" }, fmtGBP(offsets0[m.id]) + " offset now"));
+    } else {
+      offsetCell = el("td", null, "—");
+    }
+
     tb.append(el("tr", null,
       nameCell,
       el("td", null, m.rate != null ? (m.rate * 100).toFixed(2).replace(/\.?0+$/, "") + "%" : "—"),
       el("td", null, m.annualPayment != null ? fmtGBP(m.annualPayment / 12) : "—"),
       el("td", null, fmtGBP(m.balance != null ? m.balance : bal0)),
-      el("td", null, m.rate != null ? fmtGBP((m.balance != null ? m.balance : bal0) * m.rate) : "—"),
+      offsetCell,
+      el("td", null, m.rate != null ? fmtGBP(interestOf(m)) : "—"),
       el("td", null, repaidIn(m.id))));
   }
   const trTot = el("tr", null);
   trTot.append(el("td", null, el("strong", null, "Total")), el("td", null, ""),
     el("td", null, el("strong", null, fmtGBP(sum(meta.map((m) => m.annualPayment || 0)) / 12))),
     el("td", null, el("strong", null, fmtGBP(sum(meta.map((m) => m.balance || 0))))),
-    el("td", null, el("strong", null, fmtGBP(sum(meta.map((m) => (m.balance || 0) * (m.rate || 0)))))),
+    el("td", null, ""),
+    el("td", null, el("strong", null, fmtGBP(sum(meta.map(interestOf))))),
     el("td", null, ""));
   tb.append(trTot);
   tbl.append(tb); summary.append(tbl);
+
+  renderOverpayCalculator(meta);
 
   renderStackedChart($("#debt-chart"), {
     mode: "bar",
@@ -2136,6 +2211,78 @@ function renderDebts() {
     tb2.append(tr);
   });
   t2.append(tb2); wrap.append(t2);
+}
+
+/* standalone annual amortisation: how long until repaid, and total interest */
+function simulateDebt(bal, rate, annualPay) {
+  let interest = 0, years = 0;
+  while (bal > 1 && years < 100) {
+    const int = bal * rate;
+    if (annualPay <= int) return { years: Infinity, interest: Infinity };
+    const pay = Math.min(bal + int, annualPay);
+    interest += int; bal = bal + int - pay; years++;
+  }
+  return { years, interest };
+}
+
+function renderOverpayCalculator(meta) {
+  const controls = $("#op-controls"), result = $("#op-result");
+  controls.textContent = ""; result.textContent = "";
+  const candidates = meta.filter((m) => m.rate != null && m.annualPayment && (m.balance || 0) > 1);
+  if (!candidates.length) { result.append(el("p", { class: "cardnote" }, "No repayment debts to overpay.")); return; }
+
+  state.opCalc = state.opCalc || { liabilityId: candidates[0].id, monthly: 200 };
+  if (!candidates.some((m) => m.id === state.opCalc.liabilityId)) state.opCalc.liabilityId = candidates[0].id;
+
+  const sel = el("select");
+  candidates.forEach((m) => sel.append(el("option", { value: m.id }, m.name)));
+  sel.value = state.opCalc.liabilityId;
+  const f1 = el("div", { class: "field" }, el("label", null, "Debt")); f1.append(sel); controls.append(f1);
+
+  const amt = el("input", { type: "number", step: "25", value: state.opCalc.monthly });
+  const f2 = el("div", { class: "field" }, el("label", null, "Extra per month £")); f2.append(amt); controls.append(f2);
+
+  const addBtn = el("button", { class: "btn primary small" }, "Add to plan as what-if");
+  const f3 = el("div", { class: "field" }, el("label", null, " ")); f3.append(addBtn); controls.append(f3);
+
+  const update = () => {
+    state.opCalc.liabilityId = sel.value;
+    state.opCalc.monthly = parseFloat(amt.value) || 0;
+    const m = candidates.find((x) => x.id === sel.value);
+    result.textContent = "";
+    const base = simulateDebt(m.balance, m.rate, m.annualPayment);
+    const over = simulateDebt(m.balance, m.rate, m.annualPayment + state.opCalc.monthly * 12);
+    if (!isFinite(base.years)) {
+      result.append(el("p", { style: "color:var(--critical)" }, "The current payment doesn't cover the interest — this debt never repays without overpaying."));
+    }
+    const line = (label, r2) => {
+      const p = el("p", { style: "margin:4px 0" });
+      p.append(el("strong", null, label + ": "),
+        isFinite(r2.years) ? `repaid in ${r2.years} years, ${fmtGBP(r2.interest)} total interest` : "never repaid");
+      return p;
+    };
+    result.append(line("Current payment (" + fmtGBP(m.annualPayment / 12) + "/mo)", base));
+    result.append(line("With " + fmtGBP(state.opCalc.monthly) + "/mo extra", over));
+    if (isFinite(base.years) && isFinite(over.years) && state.opCalc.monthly > 0) {
+      const saved = base.interest - over.interest;
+      const sooner = base.years - over.years;
+      const p = el("p", { style: "margin:6px 0 0;font-weight:600;color:var(--good-text)" });
+      p.append(`Repaid ${sooner} year${sooner === 1 ? "" : "s"} sooner, saving ${fmtGBP(saved)} in interest.`);
+      result.append(p);
+    }
+  };
+  sel.addEventListener("change", update);
+  amt.addEventListener("input", update);
+  addBtn.addEventListener("click", () => {
+    state.data.events.push({
+      id: "evt-" + Date.now().toString(36),
+      name: "Overpay " + (candidates.find((x) => x.id === sel.value) || {}).name,
+      template: "mortgageOverpay", enabled: true,
+      params: { liabilityId: sel.value, year: 0, monthly: parseFloat(amt.value) || 0 },
+    });
+    recompute();
+  });
+  update();
 }
 
 /* ═══════════════════════════ inheritance tax ═══════════════════════════ */

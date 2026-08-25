@@ -71,9 +71,10 @@ you'd lose their saved events and overrides.
 Live in the browser: change global/per-year inflation, wage growth and per-asset growth;
 add/edit/toggle what-if life events (retirement age, salary changes, career breaks, property
 purchase/sale, windfalls, school fees, gifts, death of a partner, redundancy, care costs,
-fully custom events); click any cash-flow year for its full breakdown; view year-by-year
-inheritance-tax exposure (Inheritance tax tab); export CSV/JSON; print the PDF report.
-Rebuild only when the underlying facts or tax rules change.
+fully custom events, mortgage overpayments); use the Debts tab's overpayment calculator
+and per-mortgage offset-savings option; click any cash-flow year for its full breakdown;
+view year-by-year inheritance-tax exposure (Inheritance tax tab); export CSV/JSON; print
+the PDF report. Rebuild only when the underlying facts or tax rules change.
 
 ## Engine approximations (be transparent if asked)
 

@@ -158,7 +158,8 @@
       "interestRate": 0.045,
       "annualPayment": 18000,
       "linkedAssetId": "home",
-      "_note": "Amortised annually: interest accrues, annualPayment reduces balance, payment appears in cash flow until repaid."
+      "offsetAssetIds": [],
+      "_note": "Amortised annually: interest accrues, annualPayment reduces balance, payment appears in cash flow until repaid. offsetAssetIds (optional): cash asset ids offset against this mortgage — the offset slice earns no (taxable) interest and mortgage interest is charged only on the balance above it. Also settable live in the plan's Debts tab."
     }
   ],
 
