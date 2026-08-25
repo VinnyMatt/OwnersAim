@@ -71,8 +71,9 @@ you'd lose their saved events and overrides.
 Live in the browser: change global/per-year inflation, wage growth and per-asset growth;
 add/edit/toggle what-if life events (retirement age, salary changes, career breaks, property
 purchase/sale, windfalls, school fees, gifts, death of a partner, redundancy, care costs,
-fully custom events); click any cash-flow year for its full breakdown; export CSV/JSON;
-print the PDF report. Rebuild only when the underlying facts or tax rules change.
+fully custom events); click any cash-flow year for its full breakdown; view year-by-year
+inheritance-tax exposure (Inheritance tax tab); export CSV/JSON; print the PDF report.
+Rebuild only when the underlying facts or tax rules change.
 
 ## Engine approximations (be transparent if asked)
 
@@ -88,10 +89,13 @@ print the PDF report. Rebuild only when the underlying facts or tax rules change
 - Shortfalls are funded in the assumptions' withdrawal order; surpluses top up the cash
   buffer then fill ISA (respecting the annual allowance) then GIA.
 - HICBC is charged on the higher earner while any child is under 18.
-- Scottish income tax bands, student loans, annual-allowance charges and IHT on death are
-  NOT modelled in v1 — say so if relevant, and consult `reference/uk-tax-legislation.md`
-  for manual guidance. From April 2027 savings/property income get dedicated rates —
-  flag this for long plans until the engine is updated.
+- The Inheritance tax tab shows year-by-year exposure (spouse exemption + transferable
+  NRB/RNRB with taper, pensions in the estate from April 2027); it does NOT deduct IHT
+  inside the projection on a death what-if, and gifts/trusts/BPR are not modelled.
+- Scottish income tax bands, student loans and annual-allowance charges are NOT modelled
+  in v1 — say so if relevant, and consult `reference/uk-tax-legislation.md` for manual
+  guidance. From April 2027 savings/property income get dedicated rates — flag this for
+  long plans until the engine is updated.
 
 ## Keeping tax rules current
 
