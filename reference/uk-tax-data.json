@@ -61,6 +61,15 @@
     "hicbcThreshold": 60000,
     "hicbcUpper": 80000
   },
+  "stampDuty": {
+    "_note": "England & NI SDLT, slice basis. Bands are [upperLimit, rate]; null = no upper limit. Scotland (LBTT) and Wales (LTT) not covered.",
+    "residentialBands": [[125000, 0], [250000, 0.02], [925000, 0.05], [1500000, 0.10], [null, 0.12]],
+    "firstTimeBuyerBands": [[300000, 0], [500000, 0.05]],
+    "firstTimeBuyerMaxPrice": 500000,
+    "additionalPropertySurcharge": 0.05,
+    "nonResidentSurcharge": 0.02,
+    "nonResidentialBands": [[150000, 0], [250000, 0.02], [null, 0.05]]
+  },
   "inheritanceTax": {
     "nilRateBand": 325000,
     "residenceNilRateBand": 175000,

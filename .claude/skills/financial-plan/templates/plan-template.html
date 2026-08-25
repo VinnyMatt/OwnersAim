@@ -5,44 +5,37 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex, nofollow">
 <title>Financial plan</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;600;700;800&family=Fraunces:opsz,wght@9..144,600;9..144,700&family=Manrope:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
-/* ───────────────────────── tokens ───────────────────────── */
+/* ═══════════ LifesPlan design language ═══════════ */
 :root {
-  color-scheme: light;
-  --page:            #f9f9f7;
-  --surface-1:       #fcfcfb;
-  --text-primary:    #0b0b0b;
-  --text-secondary:  #52514e;
-  --text-muted:      #898781;
-  --grid:            #e1e0d9;
-  --baseline:        #c3c2b7;
-  --border:          rgba(11,11,11,0.10);
-  --accent:          #2a78d6;
-  --accent-soft:     rgba(42,120,214,0.10);
-  --good:            #0ca30c;
-  --good-text:       #006300;
-  --warning:         #fab219;
-  --critical:        #d03b3b;
-  --s1: #2a78d6; --s2: #eb6834; --s3: #1baf7a; --s4: #eda100;
-  --s5: #e87ba4; --s6: #008300; --s7: #4a3aa7; --s8: #e34948;
-}
-@media (prefers-color-scheme: dark) {
-  :root {
-    color-scheme: dark;
-    --page:            #0d0d0d;
-    --surface-1:       #1a1a19;
-    --text-primary:    #ffffff;
-    --text-secondary:  #c3c2b7;
-    --text-muted:      #898781;
-    --grid:            #2c2c2a;
-    --baseline:        #383835;
-    --border:          rgba(255,255,255,0.10);
-    --accent:          #3987e5;
-    --accent-soft:     rgba(57,135,229,0.14);
-    --good-text:       #0ca30c;
-    --s1: #3987e5; --s2: #d95926; --s3: #199e70; --s4: #c98500;
-    --s5: #d55181; --s6: #008300; --s7: #9085e9; --s8: #e66767;
-  }
+  color-scheme: dark;
+  --page:            #0C0B12;
+  --surface-1:       #14121C;
+  --raised:          #181622;
+  --text-primary:    #F7F5EE;
+  --text-secondary:  rgba(247,245,238,.68);
+  --text-muted:      rgba(247,245,238,.42);
+  --grid:            rgba(247,245,238,.09);
+  --baseline:        rgba(247,245,238,.16);
+  --border:          rgba(247,245,238,.14);
+  --border-soft:     rgba(247,245,238,.09);
+  --accent:          #8B7BF7;
+  --accent-soft:     rgba(139,123,247,.14);
+  --good:            #25AE8F;
+  --good-text:       #25AE8F;
+  --warning:         #E8A23F;
+  --critical:        #F26F53;
+  --shadow:          0 1px 0 rgba(247,245,238,.04) inset, 0 24px 60px -26px rgba(0,0,0,.7);
+  /* chart series — brand-derived, validated on the dark surface */
+  --s1: #3D8FD6; --s2: #E25436; --s3: #1E9C80; --s4: #C98500;
+  --s5: #D55181; --s6: #008300; --s7: #8B7BF7; --s8: #E05252;
+  --font-body: "Manrope", ui-sans-serif, system-ui, sans-serif;
+  --font-head: "Archivo", ui-sans-serif, system-ui, sans-serif;
+  --font-display: "Fraunces", Georgia, serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, monospace;
 }
 
 * { box-sizing: border-box; }
@@ -50,83 +43,111 @@ html, body { margin: 0; padding: 0; }
 body {
   background: var(--page);
   color: var(--text-primary);
-  font: 15px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif;
+  font: 15px/1.62 var(--font-body);
+  -webkit-font-smoothing: antialiased;
+  background-image:
+    radial-gradient(1200px 520px at 20% -8%, rgba(139,123,247,.13), transparent 62%),
+    radial-gradient(900px 460px at 92% -4%, rgba(76,155,224,.06), transparent 60%);
+  background-repeat: no-repeat;
 }
-h1, h2, h3 { line-height: 1.25; margin: 0 0 .4em; }
+::selection { background: var(--accent); color: #fff; }
+h1, h2, h3 { font-family: var(--font-head); font-weight: 700; letter-spacing: -0.015em; line-height: 1.25; margin: 0 0 .4em; }
 h1 { font-size: 22px; } h2 { font-size: 18px; } h3 { font-size: 15px; }
 p  { margin: 0 0 .8em; }
 button { font: inherit; cursor: pointer; }
-input, select { font: inherit; color: var(--text-primary); background: var(--surface-1); }
+input, select { font: inherit; color: var(--text-primary); background: var(--raised); }
 a { color: var(--accent); }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 2px; }
 
-/* ───────────────────────── app frame ───────────────────────── */
+/* ───────── app frame ───────── */
 .app-header {
   display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px;
-  padding: 14px 22px; border-bottom: 1px solid var(--border);
-  background: var(--surface-1);
+  padding: 14px 24px; border-bottom: 1px solid var(--border-soft);
+  background: rgba(12,11,18,.78);
+  backdrop-filter: blur(14px);
   position: sticky; top: 0; z-index: 40;
 }
 .app-header .titleblock { margin-right: auto; }
-.app-header h1 { font-size: 17px; margin: 0; }
-.app-header .sub { color: var(--text-muted); font-size: 12px; }
+.app-header h1 { font-size: 17px; margin: 0; display: flex; align-items: center; gap: 9px; }
+.app-header h1::before {
+  content: ""; width: 18px; height: 18px; flex: 0 0 auto; border-radius: 50%;
+  border: 1.6px solid var(--accent);
+  background:
+    linear-gradient(var(--accent), var(--accent)) 50% 28%/1.6px 5px no-repeat,
+    linear-gradient(var(--accent), var(--accent)) 62% 52%/5px 1.6px no-repeat;
+}
+.app-header .sub { color: var(--text-muted); font-family: var(--font-mono); font-size: 11px; letter-spacing: .02em; }
 .toolbar { display: flex; gap: 8px; flex-wrap: wrap; }
 .btn {
-  border: 1px solid var(--border); background: var(--surface-1);
-  color: var(--text-primary); border-radius: 8px; padding: 7px 13px;
-  font-size: 13px; font-weight: 500;
+  font-family: var(--font-body); font-weight: 700; font-size: 13px;
+  border: 1px solid var(--border); background: transparent;
+  color: var(--text-primary); border-radius: 999px; padding: 8px 16px;
+  display: inline-flex; align-items: center; gap: 8px; white-space: nowrap;
+  transition: background .16s, color .16s, transform .16s, box-shadow .16s;
 }
-.btn:hover { background: var(--accent-soft); }
-.btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
-.btn.primary:hover { filter: brightness(1.08); }
-.btn.small { padding: 4px 9px; font-size: 12px; border-radius: 6px; }
+.btn:hover { transform: translateY(-1px); background: var(--accent-soft); }
+.btn.primary {
+  background: var(--accent); border-color: transparent; color: #fff;
+  box-shadow: 0 1px 0 rgba(255,255,255,.16) inset, 0 10px 26px -12px rgba(139,123,247,.75);
+}
+.btn.primary:hover { background: #9A8CFF; box-shadow: 0 12px 30px -10px rgba(139,123,247,.6); }
+.btn.small { padding: 4px 12px; font-size: 12px; }
 .btn.danger { color: var(--critical); }
 
 .tabs {
-  display: flex; gap: 2px; padding: 0 18px; background: var(--surface-1);
-  border-bottom: 1px solid var(--border); position: sticky; top: 63px; z-index: 39;
+  display: flex; gap: 2px; padding: 0 18px; background: rgba(12,11,18,.78);
+  backdrop-filter: blur(14px);
+  border-bottom: 1px solid var(--border-soft); position: sticky; top: 63px; z-index: 39;
   overflow-x: auto;
 }
 .tabs button {
-  border: 0; background: none; padding: 11px 14px; font-size: 14px;
+  border: 0; background: none; padding: 12px 14px; font-size: 13.5px; font-weight: 600;
+  font-family: var(--font-body);
   color: var(--text-secondary); border-bottom: 2px solid transparent; white-space: nowrap;
 }
-.tabs button.active { color: var(--text-primary); font-weight: 600; border-bottom-color: var(--accent); }
+.tabs button.active { color: var(--text-primary); border-bottom-color: var(--accent); }
 .tabs button:hover { color: var(--text-primary); }
 
-main { max-width: 1180px; margin: 0 auto; padding: 22px 22px 80px; }
+main { max-width: 1180px; margin: 0 auto; padding: 24px 24px 80px; }
 .tabpane { display: none; }
 .tabpane.active { display: block; }
 
 .card {
-  background: var(--surface-1); border: 1px solid var(--border);
-  border-radius: 12px; padding: 18px 20px; margin-bottom: 18px;
+  background: linear-gradient(180deg, rgba(247,245,238,.025), rgba(247,245,238,0) 90px), var(--raised);
+  border: 1px solid var(--border); border-radius: 18px;
+  padding: 22px 24px; margin-bottom: 18px;
+  box-shadow: var(--shadow);
 }
 .card > h2:first-child, .card > h3:first-child { margin-top: 0; }
+.card > h2:first-child::before, .card > h3:first-child::before {
+  content: ""; display: block; width: 34px; height: 4px; border-radius: 2px;
+  background: var(--accent); margin-bottom: 14px;
+}
 .cardnote { color: var(--text-muted); font-size: 12.5px; margin-top: -4px; }
 .grid2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 18px; }
 
 /* stat tiles */
 .tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 14px; margin-bottom: 18px; }
 .tile {
-  background: var(--surface-1); border: 1px solid var(--border);
-  border-radius: 12px; padding: 14px 16px;
+  background: var(--raised); border: 1px solid var(--border);
+  border-radius: 18px; padding: 16px 18px; box-shadow: var(--shadow);
 }
-.tile .label { font-size: 12.5px; color: var(--text-secondary); }
-.tile .value { font-size: 26px; font-weight: 600; margin-top: 2px; }
+.tile .label { font-family: var(--font-mono); font-size: 10.5px; letter-spacing: .14em; text-transform: uppercase; color: var(--text-secondary); }
+.tile .value { font-family: var(--font-head); font-size: 27px; font-weight: 700; letter-spacing: -0.03em; margin-top: 4px; }
 .tile .delta { font-size: 12.5px; margin-top: 2px; color: var(--text-secondary); }
 .tile .delta.up { color: var(--good-text); }
 .tile .delta.down { color: var(--critical); }
 
 /* controls */
 .controls { display: flex; flex-wrap: wrap; gap: 10px 18px; align-items: end; margin-bottom: 14px; }
-.field { display: flex; flex-direction: column; gap: 3px; }
-.field label { font-size: 12px; color: var(--text-secondary); }
+.field { display: flex; flex-direction: column; gap: 4px; }
+.field label { font-family: var(--font-mono); font-size: 10.5px; letter-spacing: .12em; text-transform: uppercase; color: var(--text-secondary); }
 .field input[type=number], .field input[type=text], .field select {
-  border: 1px solid var(--border); border-radius: 7px; padding: 6px 9px; width: 130px;
+  border: 1px solid var(--border); border-radius: 10px; padding: 7px 10px; width: 140px;
 }
 .field input.wide { width: 220px; }
-.seg { display: inline-flex; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
-.seg button { border: 0; background: none; padding: 6px 12px; font-size: 13px; color: var(--text-secondary); }
+.seg { display: inline-flex; border: 1px solid var(--border); border-radius: 999px; overflow: hidden; }
+.seg button { border: 0; background: none; padding: 6px 14px; font-size: 13px; color: var(--text-secondary); }
 .seg button.active { background: var(--accent-soft); color: var(--text-primary); font-weight: 600; }
 
 /* tables */
@@ -138,14 +159,18 @@ table.data {
 table.data th, table.data td {
   padding: 6px 10px; text-align: right; border-bottom: 1px solid var(--grid); white-space: nowrap;
 }
-table.data th { color: var(--text-secondary); font-weight: 600; font-size: 12px; position: sticky; top: 0; background: var(--surface-1); }
+table.data th {
+  color: var(--text-secondary); font-family: var(--font-mono); font-weight: 500;
+  font-size: 10.5px; letter-spacing: .1em; text-transform: uppercase;
+  position: sticky; top: 0; background: var(--raised);
+}
 table.data td:first-child, table.data th:first-child { text-align: left; }
 table.data tr:hover td { background: var(--accent-soft); }
 table.data tr.selected td { background: var(--accent-soft); }
 table.data tr.shortfall td { color: var(--critical); }
 table.data td.neg { color: var(--critical); }
 table.data input[type=number] {
-  width: 72px; border: 1px solid var(--border); border-radius: 5px; padding: 2px 5px; text-align: right; font-size: 12.5px;
+  width: 72px; border: 1px solid var(--border); border-radius: 7px; padding: 2px 6px; text-align: right; font-size: 12.5px;
 }
 .swatch { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 7px; vertical-align: baseline; }
 .linekey { display: inline-block; width: 14px; height: 3px; border-radius: 2px; margin-right: 7px; vertical-align: middle; }
@@ -153,11 +178,11 @@ table.data input[type=number] {
 /* charts */
 .chartbox { position: relative; }
 .chartbox svg { display: block; width: 100%; height: auto; }
-.chart-legend { display: flex; flex-wrap: wrap; gap: 6px 16px; margin: 10px 2px 0; font-size: 12.5px; color: var(--text-secondary); }
+.chart-legend { display: flex; flex-wrap: wrap; gap: 6px 16px; margin: 12px 2px 0; font-size: 12.5px; color: var(--text-secondary); }
 .chart-legend .item { display: inline-flex; align-items: center; }
 svg .gridline { stroke: var(--grid); stroke-width: 1; }
 svg .axisline { stroke: var(--baseline); stroke-width: 1; }
-svg .ticktext { fill: var(--text-muted); font-size: 11px; }
+svg .ticktext { fill: var(--text-muted); font-size: 11px; font-family: var(--font-mono); }
 svg .crosshair { stroke: var(--baseline); stroke-width: 1; }
 svg .overlayline { stroke: var(--text-primary); }
 svg .fill-s1 { fill: var(--s1); } svg .fill-s2 { fill: var(--s2); }
@@ -170,57 +195,65 @@ svg .stroke-s5 { stroke: var(--s5); } svg .stroke-s6 { stroke: var(--s6); }
 svg .stroke-s7 { stroke: var(--s7); } svg .stroke-s8 { stroke: var(--s8); }
 svg .shortfall-dot { fill: var(--critical); }
 
+/* Voyant-style bar hover: hovered year lifts, the rest recede */
+svg .col { transition: opacity .12s ease; }
+svg.hovering .col:not(.hot) { opacity: .4; }
+svg .col.hot { opacity: 1; }
+
 .viz-tooltip {
   position: fixed; z-index: 100; pointer-events: none;
-  background: var(--surface-1); border: 1px solid var(--border); border-radius: 9px;
-  box-shadow: 0 4px 18px rgba(0,0,0,.18);
-  padding: 9px 12px; font-size: 12.5px; min-width: 170px; display: none;
+  background: var(--raised); border: 1px solid var(--border); border-radius: 12px;
+  box-shadow: 0 18px 44px -12px rgba(0,0,0,.75);
+  padding: 10px 13px; font-size: 12.5px; min-width: 180px; display: none;
 }
-.viz-tooltip .tt-title { font-weight: 600; margin-bottom: 5px; }
+.viz-tooltip .tt-title { font-weight: 700; font-family: var(--font-head); margin-bottom: 6px; }
 .viz-tooltip .tt-row { display: flex; justify-content: space-between; gap: 14px; padding: 1px 0; }
 .viz-tooltip .tt-row .nm { color: var(--text-secondary); }
 .viz-tooltip .tt-row .val { font-weight: 600; font-variant-numeric: tabular-nums; }
 .viz-tooltip .tt-total { border-top: 1px solid var(--grid); margin-top: 4px; padding-top: 4px; }
+.viz-tooltip .tt-total .nm { color: var(--text-primary); font-weight: 600; }
 
 /* what-if */
 .event-list { display: flex; flex-direction: column; gap: 10px; }
 .event-card {
-  border: 1px solid var(--border); border-radius: 10px; padding: 11px 14px;
-  display: flex; align-items: center; gap: 12px; background: var(--surface-1);
+  border: 1px solid var(--border); border-radius: 14px; padding: 12px 15px;
+  display: flex; align-items: center; gap: 12px; background: var(--raised);
 }
 .event-card.disabled { opacity: .55; }
 .event-card .ev-main { flex: 1; min-width: 0; }
-.event-card .ev-name { font-weight: 600; font-size: 14px; }
+.event-card .ev-name { font-weight: 700; font-family: var(--font-head); font-size: 13.5px; }
 .event-card .ev-desc { font-size: 12.5px; color: var(--text-secondary); }
 .switch { position: relative; width: 38px; height: 22px; flex: none; }
 .switch input { opacity: 0; width: 100%; height: 100%; position: absolute; margin: 0; cursor: pointer; }
 .switch .track {
-  position: absolute; inset: 0; border-radius: 11px; background: var(--baseline); transition: background .15s;
+  position: absolute; inset: 0; border-radius: 11px; background: rgba(247,245,238,.18); transition: background .15s;
 }
 .switch .track::after {
   content: ""; position: absolute; top: 2px; left: 2px; width: 18px; height: 18px;
-  border-radius: 50%; background: #fff; transition: left .15s; box-shadow: 0 1px 3px rgba(0,0,0,.3);
+  border-radius: 50%; background: #fff; transition: left .15s; box-shadow: 0 1px 3px rgba(0,0,0,.4);
 }
 .switch input:checked + .track { background: var(--accent); }
 .switch input:checked + .track::after { left: 18px; }
 .tmpl-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 10px; }
 .tmpl-btn {
-  border: 1px solid var(--border); border-radius: 10px; background: var(--surface-1);
-  padding: 12px; text-align: left;
+  border: 1px solid var(--border); border-radius: 14px; background: var(--raised);
+  padding: 13px; text-align: left; color: var(--text-primary);
+  transition: background .15s, transform .15s;
 }
-.tmpl-btn:hover { background: var(--accent-soft); }
-.tmpl-btn .t-name { font-weight: 600; font-size: 13.5px; }
+.tmpl-btn:hover { background: var(--accent-soft); transform: translateY(-1px); }
+.tmpl-btn .t-name { font-weight: 700; font-family: var(--font-head); font-size: 13px; }
 .tmpl-btn .t-desc { font-size: 12px; color: var(--text-secondary); margin-top: 2px; }
 
 /* modal */
 .modal-back {
-  position: fixed; inset: 0; background: rgba(0,0,0,.45); z-index: 60;
+  position: fixed; inset: 0; background: rgba(5,4,9,.66); z-index: 60;
   display: none; align-items: flex-start; justify-content: center; padding: 6vh 16px;
 }
 .modal-back.open { display: flex; }
 .modal {
-  background: var(--surface-1); border: 1px solid var(--border); border-radius: 14px;
-  width: 100%; max-width: 640px; max-height: 86vh; overflow-y: auto; padding: 20px 22px;
+  background: var(--raised); border: 1px solid var(--border); border-radius: 20px;
+  width: 100%; max-width: 640px; max-height: 86vh; overflow-y: auto; padding: 22px 24px;
+  box-shadow: var(--shadow);
 }
 .modal h3 { margin-top: 0; }
 .formgrid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px 16px; margin: 12px 0 16px; }
@@ -229,8 +262,8 @@ svg .shortfall-dot { fill: var(--critical); }
 /* year drawer */
 .drawer {
   position: fixed; top: 0; right: 0; bottom: 0; width: min(480px, 94vw); z-index: 55;
-  background: var(--surface-1); border-left: 1px solid var(--border);
-  box-shadow: -8px 0 30px rgba(0,0,0,.2); transform: translateX(105%);
+  background: var(--raised); border-left: 1px solid var(--border);
+  box-shadow: -18px 0 44px rgba(0,0,0,.5); transform: translateX(105%);
   transition: transform .22s ease; overflow-y: auto; padding: 20px 22px;
 }
 .drawer.open { transform: translateX(0); }
@@ -239,37 +272,39 @@ svg .shortfall-dot { fill: var(--critical); }
 .drawer .yearnav { display: flex; gap: 8px; margin-bottom: 10px; }
 
 footer.privacy {
-  max-width: 1180px; margin: 30px auto 0; padding: 0 22px 30px;
-  color: var(--text-muted); font-size: 12px;
+  max-width: 1180px; margin: 30px auto 0; padding: 0 24px 30px;
+  color: var(--text-muted); font-size: 12px; line-height: 1.65;
 }
 
-/* ───────────────────────── print / PDF report ───────────────────────── */
+/* ───────── print / PDF report — always light ───────── */
 #report { display: none; }
 @media print {
   :root {
     color-scheme: light;
-    --page: #fff; --surface-1: #fff;
+    --page: #fff; --surface-1: #fff; --raised: #fff;
     --text-primary: #0b0b0b; --text-secondary: #52514e; --text-muted: #898781;
-    --grid: #e1e0d9; --baseline: #c3c2b7; --border: rgba(11,11,11,.14);
-    --accent: #2a78d6; --accent-soft: rgba(42,120,214,.08);
-    --good-text: #006300;
-    --s1:#2a78d6; --s2:#eb6834; --s3:#1baf7a; --s4:#eda100;
-    --s5:#e87ba4; --s6:#008300; --s7:#4a3aa7; --s8:#e34948;
+    --grid: #e1e0d9; --baseline: #c3c2b7; --border: rgba(11,11,11,.14); --border-soft: rgba(11,11,11,.09);
+    --accent: #8B7BF7; --accent-soft: rgba(139,123,247,.08);
+    --good-text: #006300; --critical: #d03b3b; --shadow: none;
+    --s1: #2a78d6; --s2: #eb6834; --s3: #1baf7a; --s4: #eda100;
+    --s5: #e87ba4; --s6: #008300; --s7: #4a3aa7; --s8: #e34948;
   }
-  body { background: #fff; font-size: 12px; }
+  body { background: #fff; font-size: 12px; background-image: none; }
   .app-header, .tabs, main, footer.privacy, .viz-tooltip, .drawer, .modal-back { display: none !important; }
   #report { display: block; padding: 0 6mm; }
   #report .rpt-page { page-break-after: always; }
   #report .rpt-page:last-child { page-break-after: auto; }
-  #report h1 { font-size: 26px; }
+  #report h1 { font-family: var(--font-display); font-weight: 600; font-size: 26px; }
   #report h2 { font-size: 17px; border-bottom: 1px solid var(--grid); padding-bottom: 4px; margin-top: 18px; }
   #report table.data { font-size: 10.5px; }
+  #report table.data th { position: static; background: #fff; }
   #report table.data th, #report table.data td { padding: 3px 7px; }
   #report .rpt-cover { padding-top: 70mm; }
   #report .rpt-cover .sub { color: var(--text-secondary); font-size: 14px; }
   #report .chart-legend { font-size: 11px; }
   #report tr { page-break-inside: avoid; }
 }
+
 </style>
 </head>
 <body>
@@ -297,6 +332,7 @@ footer.privacy {
   <button data-tab="debts">Debts</button>
   <button data-tab="cashflow">Cash flow</button>
   <button data-tab="whatif">What-if</button>
+  <button data-tab="sdlt">Stamp duty</button>
   <button data-tab="iht">Inheritance tax</button>
 </nav>
 
@@ -405,6 +441,17 @@ footer.privacy {
     </div>
   </section>
 
+  <section class="tabpane" id="pane-sdlt">
+    <div class="card">
+      <h2>Stamp duty calculator</h2>
+      <p class="cardnote">Stamp Duty Land Tax on a property purchase in England or Northern Ireland, charged in slices. Scotland (LBTT) and Wales (LTT) use different bands.</p>
+      <div class="controls" id="sdlt-controls"></div>
+      <div class="tiles" id="sdlt-tiles" style="grid-template-columns:repeat(auto-fit,minmax(160px,1fr))"></div>
+      <div class="tablewrap" id="sdlt-table"></div>
+      <p class="cardnote" id="sdlt-note" style="margin-top:10px"></p>
+    </div>
+  </section>
+
   <section class="tabpane" id="pane-iht">
     <div class="card">
       <h2>Inheritance tax exposure</h2>
@@ -428,9 +475,10 @@ footer.privacy {
 </main>
 
 <footer class="privacy">
-  <strong>Privacy:</strong> this file is self-contained. It makes no network requests, stores nothing outside this
-  file, and all calculations run locally in your browser. Treat the file itself as confidential — it embeds the
-  client's financial data. <strong>Important:</strong> this is an illustrative cash-flow model, not financial advice;
+  <strong>Privacy:</strong> this file is self-contained: your financial data never leaves it, nothing is stored
+  outside it, and all calculations run locally in your browser. The only network request is loading the display
+  fonts (no data is sent, and the plan works fully offline with system fonts). Treat the file itself as
+  confidential — it embeds the client's financial data. <strong>Important:</strong> this is an illustrative cash-flow model, not financial advice;
   projections depend on the assumptions shown, are not guaranteed, and tax rules may change.
 </footer>
 
@@ -1283,7 +1331,7 @@ function showTooltip(x, y, title, rows, totalRow) {
   tooltip.textContent = "";
   tooltip.append(el("div", { class: "tt-title" }, title));
   for (const r of rows) {
-    const row = el("div", { class: "tt-row" });
+    const row = el("div", { class: "tt-row" + (r.em ? " tt-total" : "") });
     const nm = el("span", { class: "nm" });
     if (r.slot) nm.append(el("span", { class: "linekey", style: `background:var(--s${r.slot});opacity:${r.opacity == null ? 1 : r.opacity}` }));
     nm.append(document.createTextNode(r.name));
@@ -1345,6 +1393,8 @@ function renderStackedChart(container, cfg) {
   const yAt = (v) => padT + ih - (v / maxV) * ih;
 
   const svg = svgEl("svg", { viewBox: `0 0 ${W} ${H}`, role: "img" });
+  const cols = []; // bar mode: one <g> per year for the Voyant-style hover lift
+  let hotCol = -1;
 
   // grid + ticks
   for (const t of ticks) {
@@ -1383,6 +1433,7 @@ function renderStackedChart(container, cfg) {
       let yTop = yAt(0);
       const bw = Math.min(24, Math.max(3, bandW - gap * 2));
       const bx = xBar(i) + (bandW - bw) / 2;
+      const col = svgEl("g", { class: "col" });
       let first = true;
       for (const s of series) {
         const v = Math.max(0, s.values[i]);
@@ -1397,12 +1448,14 @@ function renderStackedChart(container, cfg) {
         const fo = String(s.opacity == null ? 1 : s.opacity);
         if (r > 0) {
           dd = `M${bx} ${yy + hh} L${bx} ${yy + r} Q${bx} ${yy} ${bx + r} ${yy} L${bx + bw - r} ${yy} Q${bx + bw} ${yy} ${bx + bw} ${yy + r} L${bx + bw} ${yy + hh} Z`;
-          svg.append(svgEl("path", { d: dd, class: `fill-s${s.slot}`, "fill-opacity": fo }));
+          col.append(svgEl("path", { d: dd, class: `fill-s${s.slot}`, "fill-opacity": fo }));
         } else {
-          svg.append(svgEl("rect", { x: bx, y: yy, width: bw, height: hh, class: `fill-s${s.slot}`, "fill-opacity": fo }));
+          col.append(svgEl("rect", { x: bx, y: yy, width: bw, height: hh, class: `fill-s${s.slot}`, "fill-opacity": fo }));
         }
         yTop = y; first = false;
       }
+      cols.push(col);
+      svg.append(col);
     }
   }
 
@@ -1439,19 +1492,41 @@ function renderStackedChart(container, cfg) {
     if (cfg.mode === "bar") return clamp(Math.floor((px - padL) / bandW), 0, nPts - 1);
     return clamp(Math.round(((px - padL) / iw) * (nPts - 1)), 0, nPts - 1);
   };
+  const setHotCol = (i) => {
+    if (hotCol === i) return;
+    if (cols[hotCol]) { cols[hotCol].classList.remove("hot"); cols[hotCol].removeAttribute("transform"); }
+    hotCol = i;
+    if (cols[i]) {
+      cols[i].classList.add("hot");
+      const cx = xBar(i) + bandW / 2;
+      cols[i].setAttribute("transform", `translate(${cx} 0) scale(1.18 1) translate(${-cx} 0)`);
+      svg.classList.add("hovering");
+    }
+  };
+  const clearHotCol = () => {
+    if (cols[hotCol]) { cols[hotCol].classList.remove("hot"); cols[hotCol].removeAttribute("transform"); }
+    hotCol = -1;
+    svg.classList.remove("hovering");
+  };
   hit.addEventListener("pointermove", (evt) => {
     const i = idxFromEvent(evt);
-    const x = cfg.mode === "bar" ? xBar(i) + bandW / 2 : xAt(i);
-    cross.setAttribute("x1", x); cross.setAttribute("x2", x);
-    cross.setAttribute("visibility", "visible");
-    const rows = [...series].reverse()
-      .filter((s) => s.values[i] > 0.5)
-      .map((s) => ({ name: s.name, value: fmtCompact(s.values[i]), slot: s.slot, opacity: s.opacity }));
-    for (const o of cfg.overlays || []) rows.push({ name: o.name, value: fmtCompact(o.values[i]) });
+    if (cfg.mode === "bar") {
+      setHotCol(i);
+    } else {
+      const x = xAt(i);
+      cross.setAttribute("x1", x); cross.setAttribute("x2", x);
+      cross.setAttribute("visibility", "visible");
+    }
+    const rows = cfg.tooltipRows ? cfg.tooltipRows(i) : [
+      ...[...series].reverse()
+        .filter((s) => s.values[i] > 0.5)
+        .map((s) => ({ name: s.name, value: fmtCompact(s.values[i]), slot: s.slot, opacity: s.opacity })),
+      ...(cfg.overlays || []).map((o) => ({ name: o.name, value: fmtCompact(o.values[i]) })),
+    ];
     showTooltip(evt.clientX, evt.clientY, cfg.tooltipTitle ? cfg.tooltipTitle(i) : cfg.labels[i], rows,
-      cfg.totalLabel ? { name: cfg.totalLabel, value: fmtCompact(stackTops[i]) } : null);
+      !cfg.tooltipRows && cfg.totalLabel ? { name: cfg.totalLabel, value: fmtCompact(stackTops[i]) } : null);
   });
-  hit.addEventListener("pointerleave", () => { cross.setAttribute("visibility", "hidden"); hideTooltip(); });
+  hit.addEventListener("pointerleave", () => { cross.setAttribute("visibility", "hidden"); clearHotCol(); hideTooltip(); });
   if (cfg.onClickYear) hit.addEventListener("click", (evt) => cfg.onClickYear(idxFromEvent(evt)));
 
   container.append(svg);
@@ -2285,6 +2360,106 @@ function renderOverpayCalculator(meta) {
   update();
 }
 
+/* ═══════════════════════════ stamp duty ═══════════════════════════ */
+const SDLT_TYPES = {
+  main: "Moving home / main residence",
+  ftb: "First-time buyer",
+  additional: "Additional property (second home / buy-to-let)",
+  commercial: "Non-residential or mixed use",
+};
+
+function sdltCalc(price, type, nonResident) {
+  const SD = TAX.stampDuty;
+  let bands, surcharge = 0, note = "";
+  if (type === "commercial") {
+    bands = SD.nonResidentialBands;
+  } else if (type === "ftb" && price <= SD.firstTimeBuyerMaxPrice) {
+    bands = SD.firstTimeBuyerBands;
+  } else {
+    if (type === "ftb") note = "First-time buyer relief is not available above " + fmtGBP(SD.firstTimeBuyerMaxPrice) + " — standard rates apply.";
+    bands = SD.residentialBands;
+    if (type === "additional") surcharge += SD.additionalPropertySurcharge;
+  }
+  if (nonResident && type !== "commercial") surcharge += SD.nonResidentSurcharge;
+
+  const rows2 = [];
+  let lower = 0, total = 0;
+  for (const [upper, rate] of bands) {
+    const top = upper == null ? Infinity : upper;
+    const slice = clamp(price - lower, 0, top - lower);
+    if (slice > 0 || lower < price) {
+      const effRate = rate + surcharge;
+      const tax = slice * effRate;
+      total += tax;
+      rows2.push({
+        band: fmtGBP(lower) + (upper == null ? " +" : " – " + fmtGBP(top)),
+        rate: effRate, slice, tax,
+      });
+    }
+    lower = top;
+    if (lower >= price) break;
+  }
+  return { rows: rows2, total, effective: price > 0 ? total / price : 0, surcharge, note };
+}
+
+function renderSDLT() {
+  state.sdlt = state.sdlt || { price: 350000, type: "main", nonRes: false };
+  const controls = $("#sdlt-controls"); controls.textContent = "";
+
+  const price = el("input", { type: "number", step: "5000", value: state.sdlt.price });
+  const f1 = el("div", { class: "field" }, el("label", null, "Property price £")); f1.append(price); controls.append(f1);
+
+  const typeSel = el("select", { style: "width:auto" });
+  for (const [k, label] of Object.entries(SDLT_TYPES)) typeSel.append(el("option", { value: k }, label));
+  typeSel.value = state.sdlt.type;
+  const f2 = el("div", { class: "field" }, el("label", null, "Buyer type")); f2.append(typeSel); controls.append(f2);
+
+  const nrWrap = el("label", { style: "display:flex;align-items:center;gap:8px;font-size:13px;color:var(--text-secondary);padding-bottom:8px" });
+  const nrCb = el("input", { type: "checkbox" });
+  nrCb.checked = state.sdlt.nonRes;
+  nrWrap.append(nrCb, "Non-UK resident (+2%)");
+  controls.append(nrWrap);
+
+  const update = () => {
+    state.sdlt.price = parseFloat(price.value) || 0;
+    state.sdlt.type = typeSel.value;
+    state.sdlt.nonRes = nrCb.checked;
+    nrWrap.style.display = typeSel.value === "commercial" ? "none" : "flex";
+    const res = sdltCalc(state.sdlt.price, state.sdlt.type, state.sdlt.nonRes);
+
+    const tiles = $("#sdlt-tiles"); tiles.textContent = "";
+    tiles.append(
+      tile("Stamp duty payable", fmtGBP(res.total)),
+      tile("Effective rate", fmtPct(res.effective)),
+      tile("Total incl. price", fmtGBP(state.sdlt.price + res.total)),
+    );
+
+    const wrap = $("#sdlt-table"); wrap.textContent = "";
+    const tbl = el("table", { class: "data" });
+    tbl.append(el("thead", null, el("tr", null, ...["Band", "Rate", "Amount in band", "Tax"].map((h) => el("th", null, h)))));
+    const tb = el("tbody");
+    for (const r of res.rows) {
+      tb.append(el("tr", null,
+        el("td", null, r.band),
+        el("td", null, fmtPct(r.rate)),
+        el("td", null, r.slice > 0 ? fmtGBP(r.slice) : "—"),
+        el("td", null, r.tax > 0 ? fmtGBP(r.tax) : "—")));
+    }
+    tb.append(el("tr", null,
+      el("td", null, el("strong", null, "Total")), el("td", null, ""), el("td", null, ""),
+      el("td", null, el("strong", null, fmtGBP(res.total)))));
+    tbl.append(tb); wrap.append(tbl);
+
+    $("#sdlt-note").textContent = (res.note ? res.note + " " : "") +
+      (res.surcharge > 0 ? "Rates shown include the " + fmtPct(res.surcharge) + " surcharge. " : "") +
+      "Tax year " + TAX.taxYear + " rates. Buying a property in a what-if? Enter this figure in the event's “Stamp duty & costs” box.";
+  };
+  price.addEventListener("input", update);
+  typeSel.addEventListener("change", update);
+  nrCb.addEventListener("change", update);
+  update();
+}
+
 /* ═══════════════════════════ inheritance tax ═══════════════════════════ */
 /* IHT if the whole estate passed to the next generation in the given year:
    spouse exemption + transferable NRB/RNRB assumed (couple = double bands),
@@ -2295,12 +2470,17 @@ function ihtForRow(r) {
   const d = state.data, rules = TAX.inheritanceTax;
   const pensionsInScope = startYear + r.i >= 2027;
   let nonPension = 0, pensions = 0, homeVal = 0;
+  const items = [];
   for (const [id, val] of Object.entries(r.assets)) {
+    if (val < 0.5) continue;
     const a = d.assets.find((x) => x.id === id || id === x.id + "-next");
     const type = a ? a.type : id.startsWith("evt-prop-") ? "property" : "other";
+    const name = a ? (id.endsWith("-next") ? "New home" : a.name) : id.startsWith("evt-prop-") ? "Property (what-if)" : id;
+    const included = type !== "pension" || pensionsInScope;
     if (type === "pension") pensions += val;
     else nonPension += val;
     if (type === "property" && a && a.isMainResidence) homeVal += val;
+    items.push({ id, name, type, val, included, slot: a ? slotFor(a.id) : 4, opacity: a ? opacityFor(a.id) : 1 });
   }
   const estate = Math.max(0, nonPension - r.liabTotal) + (pensionsInScope ? pensions : 0);
   const mult = Math.min(2, d.people.length);
@@ -2308,7 +2488,7 @@ function ihtForRow(r) {
   const rnrbBase = Math.min(rules.residenceNilRateBand * mult, homeVal);
   const rnrb = Math.max(0, rnrbBase - Math.max(0, estate - rules.rnrbTaperThreshold) / 2);
   const taxable = Math.max(0, estate - nrb - rnrb);
-  return { estate, pensions: pensionsInScope ? pensions : 0, pensionsExcluded: pensionsInScope ? 0 : pensions, nrb, rnrb, taxable, iht: taxable * rules.rate };
+  return { estate, pensions: pensionsInScope ? pensions : 0, pensionsExcluded: pensionsInScope ? 0 : pensions, nrb, rnrb, taxable, iht: taxable * rules.rate, items, debts: r.liabTotal };
 }
 
 function renderIHT() {
@@ -2322,6 +2502,25 @@ function renderIHT() {
     overlays: [{ name: "Estate subject to IHT", values: calc.map((c) => c.estate) }],
     height: 340,
     tooltipTitle: (i) => rows[i].label + " · " + agesLabel(rows[i]),
+    tooltipRows: (i) => {
+      const c = calc[i];
+      const out = [];
+      const included = c.items.filter((x) => x.included).sort((a, b) => b.val - a.val);
+      const shown = included.slice(0, 8);
+      for (const x of shown) out.push({ name: x.name, value: fmtCompact(x.val), slot: x.slot, opacity: x.opacity });
+      if (included.length > shown.length) {
+        const rest = sum(included.slice(8).map((x) => x.val));
+        out.push({ name: "…" + (included.length - shown.length) + " more assets", value: fmtCompact(rest) });
+      }
+      if (c.debts > 0.5) out.push({ name: "Less debts", value: "−" + fmtCompact(c.debts) });
+      if (c.pensionsExcluded > 0.5) out.push({ name: "Pensions (outside estate until Apr 2027)", value: "excl. " + fmtCompact(c.pensionsExcluded) });
+      out.push({ name: "Estate", value: fmtCompact(c.estate), em: true });
+      out.push({ name: "Nil-rate bands", value: "−" + fmtCompact(c.nrb) });
+      out.push({ name: "Residence nil-rate band", value: c.rnrb > 0.5 ? "−" + fmtCompact(c.rnrb) : "tapered to £0" });
+      out.push({ name: "Taxable estate", value: fmtCompact(c.taxable) });
+      out.push({ name: "IHT at " + fmtPct(TAX.inheritanceTax.rate), value: fmtCompact(c.iht), em: true });
+      return out;
+    },
     onClickYear: (i) => openYearDrawer(i),
   });
 
@@ -2548,6 +2747,7 @@ function renderAll() {
   renderWhatIf();
   renderAssumptions();
   renderDebts();
+  renderSDLT();
   renderIHT();
   renderDataView();
 }
