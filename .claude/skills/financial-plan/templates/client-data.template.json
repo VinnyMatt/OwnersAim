@@ -149,6 +149,19 @@
     }
   ],
 
+  "businesses": [
+    {
+      "_note": "Optional: businesses the clients own. Each gets its own growth model on the 'Businesses owned' tab; the owned share of the valuation feeds net worth and IHT. Link the salary/dividend income entries drawn from it so a 'Sell the business' what-if stops them. valuationBasis 'multiple' values at profit × valuationMultiple; 'fixed' grows valuationToday at growthRate.",
+      "_example": {
+        "id": "biz-1", "name": "Example Trading Ltd", "ownerId": "client", "ownershipPct": 1.0,
+        "valuationBasis": "multiple", "annualTurnover": 400000, "turnoverGrowth": 0.04,
+        "profitMargin": 0.18, "valuationMultiple": 4,
+        "valuationToday": 0, "growthRate": 0.03,
+        "salaryIncomeId": "salary-client", "dividendIncomeId": "dividends-client"
+      }
+    }
+  ],
+
   "liabilities": [
     {
       "id": "mortgage",

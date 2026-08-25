@@ -329,6 +329,7 @@ footer.privacy {
   <button data-tab="overview">Overview</button>
   <button data-tab="tax">Tax</button>
   <button data-tab="networth">Net worth</button>
+  <button data-tab="business">Businesses owned</button>
   <button data-tab="debts">Debts</button>
   <button data-tab="cashflow">Cash flow</button>
   <button data-tab="whatif">What-if</button>
@@ -370,6 +371,20 @@ footer.privacy {
       <h3>Balances by year</h3>
       <div class="tablewrap" id="nw-table"></div>
     </div>
+  </section>
+
+  <section class="tabpane" id="pane-business">
+    <div class="card">
+      <h2>Businesses owned</h2>
+      <p class="cardnote">A separate growth model for each business: turnover grows, profit follows the margin, and the valuation (your owned share) feeds straight into net worth and inheritance tax. Link the salary or dividends you draw so a sale switches them off.</p>
+      <div id="biz-editors"></div>
+      <p style="margin:12px 0 0"><button class="btn primary" id="btn-add-biz">+ Add a business</button></p>
+    </div>
+    <div class="card" id="biz-chart-card">
+      <h3>Business value & profit over time</h3>
+      <div class="chartbox" id="biz-chart"></div>
+    </div>
+    <div id="biz-tables"></div>
   </section>
 
   <section class="tabpane" id="pane-debts">
@@ -547,6 +562,11 @@ function computeAssetSlots(d) {
     map[a.id] = { slot: s, shade: counts[s] };
     counts[s]++;
   }
+  for (const b of d.businesses || []) {
+    counts[7] = counts[7] || 0;
+    map["biz-" + b.id] = { slot: 7, shade: counts[7] };
+    counts[7]++;
+  }
   return map;
 }
 const SHADE_OPACITY = [1, 0.7, 0.48, 0.32];
@@ -564,6 +584,7 @@ const state = {
   base: null,               // baseline projection (no events)
 };
 state.data.events = state.data.events || [];
+state.data.businesses = state.data.businesses || [];
 state.data.assumptions.yearOverrides = state.data.assumptions.yearOverrides || {};
 state.taxPerson = state.data.people[0].id;
 
@@ -586,6 +607,19 @@ function assetGrowthFor(asset, i) {
   return asset.growthRate != null ? asset.growthRate : 0.04;
 }
 const cumFactor = (rateFn, uptoIdx) => { let f = 1; for (let i = 1; i <= uptoIdx; i++) f *= 1 + rateFn(i); return f; };
+
+/* business growth model: turnover → profit → valuation (owned share) */
+function bizMetrics(b, i) {
+  const turnover = (b.annualTurnover || 0) * Math.pow(1 + (b.turnoverGrowth != null ? b.turnoverGrowth : 0.03), i);
+  const profit = turnover * (b.profitMargin != null ? b.profitMargin : 0.15);
+  let valuation;
+  if (b.valuationBasis === "fixed") {
+    valuation = (b.valuationToday || 0) * Math.pow(1 + (b.growthRate != null ? b.growthRate : 0.03), i);
+  } else {
+    valuation = profit * (b.valuationMultiple != null ? b.valuationMultiple : 4);
+  }
+  return { turnover, profit, valuation: valuation * (b.ownershipPct != null ? b.ownershipPct : 1) };
+}
 
 /* ═══════════════════════════ UK tax engine ═══════════════════════════ */
 /* Core income tax + NI for one person-year. All approximations documented in SKILL.md. */
@@ -817,6 +851,20 @@ const EVENT_TEMPLATES = {
     ],
     describe: (p, d) => `Care for ${personName(d, p.personId)}: ${fmtGBP(p.annual)}/yr from ${p.fromAge}`,
   },
+  sellBusiness: {
+    name: "Sell the business", group: "Business",
+    desc: "Sell a business — proceeds arrive net of CGT and any linked salary or dividends stop.",
+    fields: [
+      { key: "businessId", label: "Business", type: "business" },
+      { key: "year", label: "Plan year", type: "year" },
+      { key: "salePrice", label: "Sale price (0 = projected valuation)", type: "number", def: 0 },
+      { key: "applyBADR", label: "Business Asset Disposal Relief?", type: "select", options: ["yes", "no"], def: "yes" },
+    ],
+    describe: (p, d) => {
+      const b = (d.businesses || []).find((x) => x.id === p.businessId);
+      return `Sell ${b ? b.name : "business"}${p.salePrice > 0 ? " for " + fmtGBP(p.salePrice) : " at projected value"}`;
+    },
+  },
   custom: {
     name: "Custom event", group: "Custom",
     desc: "Any recurring or one-off change to income, spending or savings.",
@@ -852,6 +900,7 @@ function compileEvents(d, events) {
     sellAsset: [],                        // {assetId, yearIdx, newHomePrice, costs}
     extraIncome: [],                      // {name, yearFrom, yearTo, annualToday, taxable, ownerId}
     debtOverpay: [],                      // {liabilityId, fromYear, annual}
+    sellBusiness: [],                     // {bizId, yearIdx, price, badr}
   };
   const yearOfAge = (personId, age) => {
     const p = d.people.find((x) => x.id === personId);
@@ -867,6 +916,14 @@ function compileEvents(d, events) {
     switch (ev.template) {
       case "retireEarly": m.retirementAge[p.personId] = p.newRetirementAge; break;
       case "mortgageOverpay": m.debtOverpay.push({ liabilityId: p.liabilityId, fromYear: p.year || 0, annual: (p.monthly || 0) * 12 }); break;
+      case "sellBusiness": {
+        m.sellBusiness.push({ bizId: p.businessId, yearIdx: p.year || 0, price: p.salePrice || 0, badr: p.applyBADR !== "no" });
+        const biz = (d.businesses || []).find((b) => b.id === p.businessId);
+        for (const incId of [biz && biz.salaryIncomeId, biz && biz.dividendIncomeId]) {
+          if (incId) m.incomeStops.push({ incomeId: incId, fromYear: p.year || 0, toYear: 9999 });
+        }
+        break;
+      }
       case "salaryChange": m.incomeSets.push({ incomeId: p.incomeId, fromYear: ownerYear(p.incomeId, p.fromAge), annualToday: p.newAnnual }); break;
       case "careerBreak": m.incomeStops.push({ incomeId: p.incomeId, fromYear: ownerYear(p.incomeId, p.fromAge), toYear: ownerYear(p.incomeId, p.fromAge) + p.years - 1 }); break;
       case "newPension": {
@@ -938,6 +995,9 @@ function runProjection(d, events) {
 
   // working copies of balances
   const assets = d.assets.map((a) => ({ ...a, bal: a.value, basis: a.type === "gia" ? a.value : 0 }));
+  for (const b of d.businesses || []) {
+    assets.push({ id: "biz-" + b.id, ownerId: b.ownerId || d.people[0].id, type: "business", name: b.name, value: 0, bal: 0, basis: 0, isBusiness: true, bizId: b.id });
+  }
   const liabs = (d.liabilities || []).map((l) => ({ ...l, bal: l.balance }));
   const alive = {}; d.people.forEach((p) => (alive[p.id] = true));
   const retAge = (p) => mods.retirementAge[p.id] != null ? mods.retirementAge[p.id] : p.retirementAge;
@@ -976,6 +1036,37 @@ function runProjection(d, events) {
           assets.push({ id: a.id + "-next", ownerId: a.ownerId, type: "property", name: "New home", value: s.newHomePrice, growthRate: a.growthRate, bal: s.newHomePrice, basis: 0, isMainResidence: a.isMainResidence });
         }
         saleProceeds.push(proceeds);
+      }
+    }
+
+    // ── businesses: mark valuation to the growth model; handle sales ──
+    let bizSaleCGT = 0;
+    const bizRow = {}, lumpNamesExtra = [];
+    for (const b of d.businesses || []) {
+      const a = assets.find((x) => x.bizId === b.id);
+      const m2 = bizMetrics(b, i);
+      const sale = mods.sellBusiness.find((s) => s.bizId === b.id && s.yearIdx === i);
+      if (sale && !a.sold) {
+        const proceeds = sale.price > 0 ? sale.price : m2.valuation;
+        const gain = proceeds; // cost basis assumed negligible — documented approximation
+        let cgt;
+        if (sale.badr) {
+          const badrSlice = Math.min(gain, TAX.capitalGains.badrLifetimeLimit);
+          cgt = badrSlice * TAX.capitalGains.badrRate + Math.max(0, gain - badrSlice) * TAX.capitalGains.rates.higher;
+        } else {
+          cgt = gain * TAX.capitalGains.rates.higher;
+        }
+        bizSaleCGT += cgt;
+        saleProceeds.push(proceeds - cgt);
+        lumpNamesExtra.push("Sale of " + b.name);
+        a.sold = true; a.bal = 0;
+        bizRow[b.id] = { ...m2, valuation: 0, soldThisYear: true, proceeds, cgt };
+      } else if (a.sold) {
+        a.bal = 0;
+        bizRow[b.id] = { turnover: 0, profit: 0, valuation: 0, sold: true };
+      } else {
+        a.bal = m2.valuation;
+        bizRow[b.id] = m2;
       }
     }
 
@@ -1109,6 +1200,7 @@ function runProjection(d, events) {
       pp.tax = taxCore(pp);
       taxTotal += pp.tax.incomeTax + pp.tax.dividendTax + pp.tax.ni;
     }
+    taxTotal += bizSaleCGT;
 
     // HICBC — child benefit for children under 18, charged on higher-ANI person
     let childBenefit = 0, hicbc = 0;
@@ -1153,7 +1245,7 @@ function runProjection(d, events) {
 
     // ── asset growth (non-cash growth; cash interest added here too; offset cash earns nothing on the offset slice) ──
     for (const a of assets) {
-      if (a.bal <= 0) continue;
+      if (a.bal <= 0 || a.isBusiness) continue;
       a.bal += Math.max(0, a.bal - (assetOffset[a.id] || 0)) * assetGrowthFor(a, i);
     }
 
@@ -1172,7 +1264,7 @@ function runProjection(d, events) {
     }
 
     // ── event lumps ──
-    let lumpIn = 0, lumpOut = 0; const lumpNames = [];
+    let lumpIn = 0, lumpOut = 0; const lumpNames = [...lumpNamesExtra];
     for (const lp of mods.lumps) if (lp.yearIdx === i) {
       const amt = lp.amount * (lp.indexed ? infl : 1);
       if (amt >= 0) lumpIn += amt; else lumpOut += -amt;
@@ -1294,7 +1386,8 @@ function runProjection(d, events) {
       ages: Object.fromEntries(d.people.map((p) => [p.id, ageIn(p, i)])),
       alive: { ...alive },
       perPerson: deepCopy(perPerson),
-      grossIncome, childBenefit, hicbc, taxTotal, withdrawalTax, cgtPaid,
+      grossIncome, childBenefit, hicbc, taxTotal, withdrawalTax, cgtPaid: cgtPaid + bizSaleCGT, bizSaleCGT,
+      businesses: bizRow,
       netIncome: grossIncome + untaxedExtra + childBenefit - taxTotal,
       spendTotal, spendItems, debtPay, debtInterest,
       pensionContribTotal, employerContribTotal, plannedSavings,
@@ -1615,7 +1708,12 @@ function assetSeries(rows) {
   rows.forEach((r) => Object.keys(r.assets).forEach((id) => ids.add(id)));
   const meta = [];
   for (const id of ids) {
-    const a = d.assets.find((x) => x.id === id) || { id, name: id.startsWith("evt-") ? "What-if asset" : id, type: "other" };
+    let a = d.assets.find((x) => x.id === id);
+    if (!a && id.startsWith("biz-")) {
+      const b = (d.businesses || []).find((x) => "biz-" + x.id === id);
+      a = { id, name: b ? b.name : "Business", type: "business" };
+    }
+    a = a || { id, name: id.startsWith("evt-") ? "What-if asset" : id, type: "other" };
     meta.push({ id, name: a.name, type: a.type || "other", slot: slotFor(id), shade: (state.assetSlots[id] || {}).shade || 0, opacity: opacityFor(id) });
   }
   meta.sort((a, b) => a.slot - b.slot || a.shade - b.shade || a.name.localeCompare(b.name));
@@ -2038,6 +2136,10 @@ function openEventForm(templateKey, existing) {
       inp = el("select");
       d.incomes.forEach((x) => inp.append(el("option", { value: x.id }, x.name)));
       if (cur) inp.value = cur;
+    } else if (f.type === "business") {
+      inp = el("select");
+      (d.businesses || []).forEach((b) => inp.append(el("option", { value: b.id }, b.name)));
+      if (cur) inp.value = cur;
     } else if (f.type === "liability") {
       inp = el("select");
       (d.liabilities || []).forEach((l) => inp.append(el("option", { value: l.id }, l.name)));
@@ -2072,7 +2174,7 @@ function openEventForm(templateKey, existing) {
   save.addEventListener("click", () => {
     const p = {};
     for (const [key, { inp, f }] of Object.entries(inputs)) {
-      if (f.type === "text" || f.type === "select" || f.type === "person" || f.type === "income" || f.type === "liability" || (f.type || "").startsWith("asset")) p[key] = inp.value;
+      if (f.type === "text" || f.type === "select" || f.type === "person" || f.type === "income" || f.type === "liability" || f.type === "business" || (f.type || "").startsWith("asset")) p[key] = inp.value;
       else p[key] = parseFloat(inp.value) || 0;
     }
     if (existing) { existing.params = p; existing.name = nameField.value || tmpl.name; existing.template = templateKey; }
@@ -2139,6 +2241,153 @@ function renderAssumptions() {
   });
   tbl.append(tb); wrap.append(tbl);
 }
+
+/* ═══════════════════════════ businesses owned ═══════════════════════════ */
+function renderBusinesses() {
+  const d = state.data, rows = state.proj;
+  const editors = $("#biz-editors"); editors.textContent = "";
+  const bizList = d.businesses || [];
+
+  if (!bizList.length) {
+    editors.append(el("p", { class: "cardnote" }, "No businesses in the plan yet. Add one to model its growth alongside the household finances."));
+  }
+
+  for (const b of bizList) {
+    const box = el("div", { style: "border:1px solid var(--border);border-radius:14px;padding:14px 16px;margin-bottom:12px;background:var(--surface-1)" });
+    const controls = el("div", { class: "controls", style: "margin-bottom:0" });
+
+    const field = (label, inp) => { const f = el("div", { class: "field" }, el("label", null, label)); f.append(inp); return f; };
+    const num = (get, set, step, width) => {
+      const inp = el("input", { type: "number", step: String(step || 1), value: get() });
+      if (width) inp.style.width = width;
+      inp.addEventListener("change", () => { set(parseFloat(inp.value) || 0); recompute(); });
+      return inp;
+    };
+
+    const nameInp = el("input", { type: "text", class: "wide", value: b.name });
+    nameInp.addEventListener("change", () => { b.name = nameInp.value || "Business"; recompute(); });
+    controls.append(field("Business name", nameInp));
+
+    const ownerSel = el("select");
+    d.people.forEach((p) => ownerSel.append(el("option", { value: p.id }, p.name.split(" ")[0])));
+    ownerSel.append(el("option", { value: "joint" }, "Joint"));
+    ownerSel.value = b.ownerId || d.people[0].id;
+    ownerSel.addEventListener("change", () => { b.ownerId = ownerSel.value; recompute(); });
+    controls.append(field("Owner", ownerSel));
+
+    controls.append(field("Ownership %", num(() => Math.round((b.ownershipPct != null ? b.ownershipPct : 1) * 100), (v) => (b.ownershipPct = v / 100), 5, "80px")));
+    controls.append(field("Turnover £/yr", num(() => Math.round(b.annualTurnover || 0), (v) => (b.annualTurnover = v), 10000)));
+    controls.append(field("Turnover growth %/yr", num(() => ((b.turnoverGrowth != null ? b.turnoverGrowth : 0.03) * 100).toFixed(1), (v) => (b.turnoverGrowth = v / 100), 0.5, "90px")));
+    controls.append(field("Profit margin %", num(() => ((b.profitMargin != null ? b.profitMargin : 0.15) * 100).toFixed(1), (v) => (b.profitMargin = v / 100), 1, "90px")));
+
+    const basisSel = el("select");
+    basisSel.append(el("option", { value: "multiple" }, "Profit × multiple"));
+    basisSel.append(el("option", { value: "fixed" }, "Fixed value + growth"));
+    basisSel.value = b.valuationBasis || "multiple";
+    basisSel.addEventListener("change", () => { b.valuationBasis = basisSel.value; recompute(); });
+    controls.append(field("Valued by", basisSel));
+
+    if ((b.valuationBasis || "multiple") === "multiple") {
+      controls.append(field("Multiple ×", num(() => b.valuationMultiple != null ? b.valuationMultiple : 4, (v) => (b.valuationMultiple = v), 0.5, "80px")));
+    } else {
+      controls.append(field("Value today £", num(() => Math.round(b.valuationToday || 0), (v) => (b.valuationToday = v), 10000)));
+      controls.append(field("Value growth %/yr", num(() => ((b.growthRate != null ? b.growthRate : 0.03) * 100).toFixed(1), (v) => (b.growthRate = v / 100), 0.5, "90px")));
+    }
+
+    const linkSel = (label, cur, onSet, filterType) => {
+      const sel = el("select");
+      sel.append(el("option", { value: "" }, "None"));
+      d.incomes.filter((x) => !filterType || x.type === filterType).forEach((x) => sel.append(el("option", { value: x.id }, x.name)));
+      sel.value = cur || "";
+      sel.addEventListener("change", () => { onSet(sel.value || null); recompute(); });
+      return field(label, sel);
+    };
+    controls.append(linkSel("Salary drawn (link)", b.salaryIncomeId, (v) => (b.salaryIncomeId = v), "employment"));
+    controls.append(linkSel("Dividends drawn (link)", b.dividendIncomeId, (v) => (b.dividendIncomeId = v), "dividend"));
+
+    const del = el("button", { class: "btn small danger" }, "Delete");
+    del.addEventListener("click", () => { d.businesses = d.businesses.filter((x) => x !== b); recompute(); });
+    const df = el("div", { class: "field" }, el("label", null, " ")); df.append(del); controls.append(df);
+
+    box.append(controls);
+    const m0 = bizMetrics(b, 0);
+    box.append(el("p", { class: "cardnote", style: "margin:10px 0 0" },
+      `Today: turnover ${fmtCompact(m0.turnover)}, net profit ${fmtCompact(m0.profit)}, your share valued at ${fmtCompact(m0.valuation)}.`));
+    editors.append(box);
+  }
+
+  // chart + tables
+  const chartCard = $("#biz-chart-card"), tables = $("#biz-tables");
+  tables.textContent = "";
+  if (!bizList.length) { chartCard.style.display = "none"; return; }
+  chartCard.style.display = "";
+
+  renderStackedChart($("#biz-chart"), {
+    mode: "bar",
+    series: bizList.map((b, ix) => ({
+      id: b.id, name: b.name, slot: 7, opacity: SHADE_OPACITY[Math.min(ix, SHADE_OPACITY.length - 1)],
+      values: rows.map((r) => (r.businesses[b.id] || {}).valuation || 0),
+    })),
+    labels: rows.map((r) => String(r.year)),
+    overlays: [{ name: "Net profit (all businesses)", values: rows.map((r) => sum(bizList.map((b) => (r.businesses[b.id] || {}).profit || 0))) }],
+    height: 320,
+    tooltipTitle: (i) => rows[i].label + " · " + agesLabel(rows[i]),
+    totalLabel: "Total business value",
+    onClickYear: (i) => openYearDrawer(i),
+  });
+
+  for (const b of bizList) {
+    const card = el("div", { class: "card" });
+    card.append(el("h3", null, b.name + " — year by year"));
+    const wrap = el("div", { class: "tablewrap" });
+    const tbl = el("table", { class: "data" });
+    tbl.append(el("thead", null, el("tr", null,
+      ...["Year", "Ages", "Turnover", "Net profit", "Valuation (your share)", "Drawn as salary", "Drawn as dividends"].map((h) => el("th", null, h)))));
+    const tb = el("tbody");
+    const linkedAmount = (r, incId) => {
+      if (!incId) return null;
+      const nm = incomeName(d, incId);
+      const item = r.incomeItems.find((x) => x.name === nm);
+      return item ? item.amount : 0;
+    };
+    rows.forEach((r, i) => {
+      const m2 = r.businesses[b.id] || {};
+      if (m2.sold && !(rows[i - 1] && rows[i - 1].businesses[b.id] && !rows[i - 1].businesses[b.id].sold)) {
+        if (i > 0 && rows[i - 1].businesses[b.id] && rows[i - 1].businesses[b.id].sold) return; // collapse post-sale years
+      }
+      const sal = linkedAmount(r, b.salaryIncomeId), div2 = linkedAmount(r, b.dividendIncomeId);
+      const tr = el("tr", null,
+        el("td", null, r.label),
+        el("td", null, agesLabel(r)),
+        el("td", null, m2.soldThisYear || m2.sold ? "—" : fmtGBP(m2.turnover || 0)),
+        el("td", null, m2.soldThisYear || m2.sold ? "—" : fmtGBP(m2.profit || 0)),
+        el("td", null, m2.soldThisYear ? "sold for " + fmtGBP(m2.proceeds) + " (CGT " + fmtGBP(m2.cgt) + ")" : m2.sold ? "sold" : fmtGBP(m2.valuation || 0)),
+        el("td", null, sal == null ? "—" : sal > 0.5 ? fmtGBP(sal) : "—"),
+        el("td", null, div2 == null ? "—" : div2 > 0.5 ? fmtGBP(div2) : "—"));
+      tr.addEventListener("click", () => openYearDrawer(i));
+      tb.append(tr);
+    });
+    tbl.append(tb); wrap.append(tbl); card.append(wrap);
+    card.append(el("p", { class: "cardnote", style: "margin-top:10px" },
+      "The valuation model is deliberately simple: turnover grows at the rate set, profit follows the margin, and value is " +
+      ((b.valuationBasis || "multiple") === "multiple" ? "profit × the multiple" : "the fixed value grown each year") +
+      ". A sale (What-if → Sell the business) assumes a negligible cost base, applies Business Asset Disposal Relief at " +
+      fmtPct(TAX.capitalGains.badrRate) + " up to " + fmtCompact(TAX.capitalGains.badrLifetimeLimit) + " and " +
+      fmtPct(TAX.capitalGains.rates.higher) + " above, credits the net proceeds to savings and stops any linked salary or dividends."));
+    tables.append(card);
+  }
+}
+
+$("#btn-add-biz").addEventListener("click", () => {
+  state.data.businesses.push({
+    id: "biz-" + Date.now().toString(36),
+    name: "My business", ownerId: state.data.people[0].id, ownershipPct: 1,
+    valuationBasis: "multiple", annualTurnover: 250000, turnoverGrowth: 0.04,
+    profitMargin: 0.15, valuationMultiple: 4,
+    salaryIncomeId: null, dividendIncomeId: null,
+  });
+  recompute();
+});
 
 /* ═══════════════════════════ debts ═══════════════════════════ */
 function debtSeries(rows) {
@@ -2473,7 +2722,11 @@ function ihtForRow(r) {
   const items = [];
   for (const [id, val] of Object.entries(r.assets)) {
     if (val < 0.5) continue;
-    const a = d.assets.find((x) => x.id === id || id === x.id + "-next");
+    let a = d.assets.find((x) => x.id === id || id === x.id + "-next");
+    if (!a && id.startsWith("biz-")) {
+      const b = (d.businesses || []).find((x) => "biz-" + x.id === id);
+      if (b) a = { id, name: b.name, type: "business" };
+    }
     const type = a ? a.type : id.startsWith("evt-prop-") ? "property" : "other";
     const name = a ? (id.endsWith("-next") ? "New home" : a.name) : id.startsWith("evt-prop-") ? "Property (what-if)" : id;
     const included = type !== "pension" || pensionsInScope;
@@ -2579,6 +2832,10 @@ function renderDataView() {
   section("Assets", ["Asset", "Owner", "Type", "Value", "Growth", "Contribution"],
     d.assets.map((a) => [a.name, a.ownerId === "joint" ? "Joint" : personName(d, a.ownerId), ASSET_TYPE_LABEL[a.type] || a.type, fmtGBP(a.value), fmtPct(a.growthRate ?? 0.04),
       a.type === "pension" && a.linkedIncomeId ? fmtPct(a.memberContributionPct || 0) + " + " + fmtPct(a.employerContributionPct || 0) + " employer" : fmtGBP(a.annualContribution || 0) + "/yr"]));
+  section("Businesses", ["Business", "Owner", "Ownership", "Turnover /yr", "Margin", "Valued by"],
+    (d.businesses || []).map((b) => [b.name, b.ownerId === "joint" ? "Joint" : personName(d, b.ownerId), fmtPct(b.ownershipPct != null ? b.ownershipPct : 1),
+      fmtGBP(b.annualTurnover || 0), fmtPct(b.profitMargin != null ? b.profitMargin : 0.15),
+      (b.valuationBasis || "multiple") === "multiple" ? (b.valuationMultiple != null ? b.valuationMultiple : 4) + "× profit" : "fixed value"]));
   section("Debts", ["Debt", "Balance", "Rate", "Payment /yr"],
     (d.liabilities || []).map((l) => [l.name, fmtGBP(l.balance), fmtPct(l.interestRate || 0), fmtGBP(l.annualPayment || 0)]));
 }
@@ -2621,6 +2878,7 @@ $("#file-input").addEventListener("change", (e) => {
       const d = JSON.parse(txt);
       if (!d.people || !d.assets) throw new Error("not a client-data file");
       d.events = d.events || [];
+      d.businesses = d.businesses || [];
       d.assumptions.yearOverrides = d.assumptions.yearOverrides || {};
       state.data = d;
       state.taxPerson = d.people[0].id;
@@ -2746,6 +3004,7 @@ function renderAll() {
   renderCashflow();
   renderWhatIf();
   renderAssumptions();
+  renderBusinesses();
   renderDebts();
   renderSDLT();
   renderIHT();

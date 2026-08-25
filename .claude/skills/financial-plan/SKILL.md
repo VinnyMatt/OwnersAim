@@ -43,6 +43,11 @@ lifetime cash-flow plan** for a client. The output is a single local HTML file b
    - Assets: cash, ISAs, GIAs, pensions (with member/employer contribution % and the salary
      they're linked to), property. Current value + any bespoke growth rate the user wants.
    - Liabilities: mortgages/loans — balance, rate, annual payment.
+   - Businesses owned (if any): turnover, growth, profit margin, valuation basis
+     (profit multiple or fixed value), ownership %, and which salary/dividend income
+     entries are drawn from it — fill the `businesses` array; the plan's "Businesses
+     owned" tab models growth, feeds net worth/IHT, and a "Sell the business" what-if
+     applies BADR CGT and stops the linked income.
    - Assumptions: default inflation 2.5%, wage growth 3.5%, growth per asset class
      (cash ~3.5%, invested ~5%, property ~3%) unless the user specifies otherwise. State
      the assumptions you've used and invite correction.

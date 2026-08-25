@@ -36,7 +36,9 @@
   },
   "capitalGains": {
     "annualExemptAmount": 3000,
-    "rates": { "basic": 0.18, "higher": 0.24 }
+    "rates": { "basic": 0.18, "higher": 0.24 },
+    "badrRate": 0.18,
+    "badrLifetimeLimit": 1000000
   },
   "isa": {
     "annualAllowance": 20000,
