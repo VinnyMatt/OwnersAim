@@ -1071,7 +1071,7 @@ function runProjection(d, events) {
     let flow = spendableIncome - spendTotal - debtPay - plannedSavings + lumpIn - lumpOut;
 
     // ── withdrawals (deficit) or surplus allocation ──
-    let withdrawals = [], withdrawalTax = 0, cgtPaid = 0, shortfall = 0;
+    let withdrawals = [], withdrawalTax = 0, cgtPaid = 0, shortfall = 0, surplusTotal = 0;
     if (flow < -0.5) {
       let need = -flow;
       const order = d.assumptions.withdrawalOrder || ["cash", "gia", "isa", "pension"];
@@ -1135,6 +1135,7 @@ function runProjection(d, events) {
       flow = 0;
     } else if (flow > 0.5) {
       let surplus = flow;
+      surplusTotal = flow;
       // top up cash buffer first
       const buffer = (d.assumptions.cashBufferTarget || 0) * infl;
       const cashAssets = assets.filter((a) => a.type === "cash");
@@ -1175,7 +1176,7 @@ function runProjection(d, events) {
       spendTotal, spendItems, debtPay, debtInterest,
       pensionContribTotal, employerContribTotal, plannedSavings,
       incomeItems, withdrawals, lumpIn, lumpOut, lumpNames: [...cbLumpNames],
-      shortfall, surplusSaved: Math.max(0, flow),
+      shortfall, surplusSaved: surplusTotal,
       assets: assetBals, assetTotal, liabTotal, netWorth: assetTotal - liabTotal,
       inflFactor: infl,
     });
