@@ -1,0 +1,2182 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Financial plan</title>
+<style>
+/* ───────────────────────── tokens ───────────────────────── */
+:root {
+  color-scheme: light;
+  --page:            #f9f9f7;
+  --surface-1:       #fcfcfb;
+  --text-primary:    #0b0b0b;
+  --text-secondary:  #52514e;
+  --text-muted:      #898781;
+  --grid:            #e1e0d9;
+  --baseline:        #c3c2b7;
+  --border:          rgba(11,11,11,0.10);
+  --accent:          #2a78d6;
+  --accent-soft:     rgba(42,120,214,0.10);
+  --good:            #0ca30c;
+  --good-text:       #006300;
+  --warning:         #fab219;
+  --critical:        #d03b3b;
+  --s1: #2a78d6; --s2: #eb6834; --s3: #1baf7a; --s4: #eda100;
+  --s5: #e87ba4; --s6: #008300; --s7: #4a3aa7; --s8: #e34948;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    color-scheme: dark;
+    --page:            #0d0d0d;
+    --surface-1:       #1a1a19;
+    --text-primary:    #ffffff;
+    --text-secondary:  #c3c2b7;
+    --text-muted:      #898781;
+    --grid:            #2c2c2a;
+    --baseline:        #383835;
+    --border:          rgba(255,255,255,0.10);
+    --accent:          #3987e5;
+    --accent-soft:     rgba(57,135,229,0.14);
+    --good-text:       #0ca30c;
+    --s1: #3987e5; --s2: #d95926; --s3: #199e70; --s4: #c98500;
+    --s5: #d55181; --s6: #008300; --s7: #9085e9; --s8: #e66767;
+  }
+}
+
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; }
+body {
+  background: var(--page);
+  color: var(--text-primary);
+  font: 15px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif;
+}
+h1, h2, h3 { line-height: 1.25; margin: 0 0 .4em; }
+h1 { font-size: 22px; } h2 { font-size: 18px; } h3 { font-size: 15px; }
+p  { margin: 0 0 .8em; }
+button { font: inherit; cursor: pointer; }
+input, select { font: inherit; color: var(--text-primary); background: var(--surface-1); }
+a { color: var(--accent); }
+
+/* ───────────────────────── app frame ───────────────────────── */
+.app-header {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px;
+  padding: 14px 22px; border-bottom: 1px solid var(--border);
+  background: var(--surface-1);
+  position: sticky; top: 0; z-index: 40;
+}
+.app-header .titleblock { margin-right: auto; }
+.app-header h1 { font-size: 17px; margin: 0; }
+.app-header .sub { color: var(--text-muted); font-size: 12px; }
+.toolbar { display: flex; gap: 8px; flex-wrap: wrap; }
+.btn {
+  border: 1px solid var(--border); background: var(--surface-1);
+  color: var(--text-primary); border-radius: 8px; padding: 7px 13px;
+  font-size: 13px; font-weight: 500;
+}
+.btn:hover { background: var(--accent-soft); }
+.btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+.btn.primary:hover { filter: brightness(1.08); }
+.btn.small { padding: 4px 9px; font-size: 12px; border-radius: 6px; }
+.btn.danger { color: var(--critical); }
+
+.tabs {
+  display: flex; gap: 2px; padding: 0 18px; background: var(--surface-1);
+  border-bottom: 1px solid var(--border); position: sticky; top: 63px; z-index: 39;
+  overflow-x: auto;
+}
+.tabs button {
+  border: 0; background: none; padding: 11px 14px; font-size: 14px;
+  color: var(--text-secondary); border-bottom: 2px solid transparent; white-space: nowrap;
+}
+.tabs button.active { color: var(--text-primary); font-weight: 600; border-bottom-color: var(--accent); }
+.tabs button:hover { color: var(--text-primary); }
+
+main { max-width: 1180px; margin: 0 auto; padding: 22px 22px 80px; }
+.tabpane { display: none; }
+.tabpane.active { display: block; }
+
+.card {
+  background: var(--surface-1); border: 1px solid var(--border);
+  border-radius: 12px; padding: 18px 20px; margin-bottom: 18px;
+}
+.card > h2:first-child, .card > h3:first-child { margin-top: 0; }
+.cardnote { color: var(--text-muted); font-size: 12.5px; margin-top: -4px; }
+.grid2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 18px; }
+
+/* stat tiles */
+.tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 14px; margin-bottom: 18px; }
+.tile {
+  background: var(--surface-1); border: 1px solid var(--border);
+  border-radius: 12px; padding: 14px 16px;
+}
+.tile .label { font-size: 12.5px; color: var(--text-secondary); }
+.tile .value { font-size: 26px; font-weight: 600; margin-top: 2px; }
+.tile .delta { font-size: 12.5px; margin-top: 2px; color: var(--text-secondary); }
+.tile .delta.up { color: var(--good-text); }
+.tile .delta.down { color: var(--critical); }
+
+/* controls */
+.controls { display: flex; flex-wrap: wrap; gap: 10px 18px; align-items: end; margin-bottom: 14px; }
+.field { display: flex; flex-direction: column; gap: 3px; }
+.field label { font-size: 12px; color: var(--text-secondary); }
+.field input[type=number], .field input[type=text], .field select {
+  border: 1px solid var(--border); border-radius: 7px; padding: 6px 9px; width: 130px;
+}
+.field input.wide { width: 220px; }
+.seg { display: inline-flex; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
+.seg button { border: 0; background: none; padding: 6px 12px; font-size: 13px; color: var(--text-secondary); }
+.seg button.active { background: var(--accent-soft); color: var(--text-primary); font-weight: 600; }
+
+/* tables */
+.tablewrap { overflow-x: auto; }
+table.data {
+  border-collapse: collapse; width: 100%; font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+table.data th, table.data td {
+  padding: 6px 10px; text-align: right; border-bottom: 1px solid var(--grid); white-space: nowrap;
+}
+table.data th { color: var(--text-secondary); font-weight: 600; font-size: 12px; position: sticky; top: 0; background: var(--surface-1); }
+table.data td:first-child, table.data th:first-child { text-align: left; }
+table.data tr:hover td { background: var(--accent-soft); }
+table.data tr.selected td { background: var(--accent-soft); }
+table.data tr.shortfall td { color: var(--critical); }
+table.data td.neg { color: var(--critical); }
+table.data input[type=number] {
+  width: 72px; border: 1px solid var(--border); border-radius: 5px; padding: 2px 5px; text-align: right; font-size: 12.5px;
+}
+.swatch { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 7px; vertical-align: baseline; }
+.linekey { display: inline-block; width: 14px; height: 3px; border-radius: 2px; margin-right: 7px; vertical-align: middle; }
+
+/* charts */
+.chartbox { position: relative; }
+.chartbox svg { display: block; width: 100%; height: auto; }
+.chart-legend { display: flex; flex-wrap: wrap; gap: 6px 16px; margin: 10px 2px 0; font-size: 12.5px; color: var(--text-secondary); }
+.chart-legend .item { display: inline-flex; align-items: center; }
+svg .gridline { stroke: var(--grid); stroke-width: 1; }
+svg .axisline { stroke: var(--baseline); stroke-width: 1; }
+svg .ticktext { fill: var(--text-muted); font-size: 11px; }
+svg .crosshair { stroke: var(--baseline); stroke-width: 1; }
+svg .overlayline { stroke: var(--text-primary); }
+svg .fill-s1 { fill: var(--s1); } svg .fill-s2 { fill: var(--s2); }
+svg .fill-s3 { fill: var(--s3); } svg .fill-s4 { fill: var(--s4); }
+svg .fill-s5 { fill: var(--s5); } svg .fill-s6 { fill: var(--s6); }
+svg .fill-s7 { fill: var(--s7); } svg .fill-s8 { fill: var(--s8); }
+svg .stroke-s1 { stroke: var(--s1); } svg .stroke-s2 { stroke: var(--s2); }
+svg .stroke-s3 { stroke: var(--s3); } svg .stroke-s4 { stroke: var(--s4); }
+svg .stroke-s5 { stroke: var(--s5); } svg .stroke-s6 { stroke: var(--s6); }
+svg .stroke-s7 { stroke: var(--s7); } svg .stroke-s8 { stroke: var(--s8); }
+svg .shortfall-dot { fill: var(--critical); }
+
+.viz-tooltip {
+  position: fixed; z-index: 100; pointer-events: none;
+  background: var(--surface-1); border: 1px solid var(--border); border-radius: 9px;
+  box-shadow: 0 4px 18px rgba(0,0,0,.18);
+  padding: 9px 12px; font-size: 12.5px; min-width: 170px; display: none;
+}
+.viz-tooltip .tt-title { font-weight: 600; margin-bottom: 5px; }
+.viz-tooltip .tt-row { display: flex; justify-content: space-between; gap: 14px; padding: 1px 0; }
+.viz-tooltip .tt-row .nm { color: var(--text-secondary); }
+.viz-tooltip .tt-row .val { font-weight: 600; font-variant-numeric: tabular-nums; }
+.viz-tooltip .tt-total { border-top: 1px solid var(--grid); margin-top: 4px; padding-top: 4px; }
+
+/* what-if */
+.event-list { display: flex; flex-direction: column; gap: 10px; }
+.event-card {
+  border: 1px solid var(--border); border-radius: 10px; padding: 11px 14px;
+  display: flex; align-items: center; gap: 12px; background: var(--surface-1);
+}
+.event-card.disabled { opacity: .55; }
+.event-card .ev-main { flex: 1; min-width: 0; }
+.event-card .ev-name { font-weight: 600; font-size: 14px; }
+.event-card .ev-desc { font-size: 12.5px; color: var(--text-secondary); }
+.switch { position: relative; width: 38px; height: 22px; flex: none; }
+.switch input { opacity: 0; width: 100%; height: 100%; position: absolute; margin: 0; cursor: pointer; }
+.switch .track {
+  position: absolute; inset: 0; border-radius: 11px; background: var(--baseline); transition: background .15s;
+}
+.switch .track::after {
+  content: ""; position: absolute; top: 2px; left: 2px; width: 18px; height: 18px;
+  border-radius: 50%; background: #fff; transition: left .15s; box-shadow: 0 1px 3px rgba(0,0,0,.3);
+}
+.switch input:checked + .track { background: var(--accent); }
+.switch input:checked + .track::after { left: 18px; }
+.tmpl-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 10px; }
+.tmpl-btn {
+  border: 1px solid var(--border); border-radius: 10px; background: var(--surface-1);
+  padding: 12px; text-align: left;
+}
+.tmpl-btn:hover { background: var(--accent-soft); }
+.tmpl-btn .t-name { font-weight: 600; font-size: 13.5px; }
+.tmpl-btn .t-desc { font-size: 12px; color: var(--text-secondary); margin-top: 2px; }
+
+/* modal */
+.modal-back {
+  position: fixed; inset: 0; background: rgba(0,0,0,.45); z-index: 60;
+  display: none; align-items: flex-start; justify-content: center; padding: 6vh 16px;
+}
+.modal-back.open { display: flex; }
+.modal {
+  background: var(--surface-1); border: 1px solid var(--border); border-radius: 14px;
+  width: 100%; max-width: 640px; max-height: 86vh; overflow-y: auto; padding: 20px 22px;
+}
+.modal h3 { margin-top: 0; }
+.formgrid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px 16px; margin: 12px 0 16px; }
+.modal .actions { display: flex; justify-content: flex-end; gap: 8px; }
+
+/* year drawer */
+.drawer {
+  position: fixed; top: 0; right: 0; bottom: 0; width: min(480px, 94vw); z-index: 55;
+  background: var(--surface-1); border-left: 1px solid var(--border);
+  box-shadow: -8px 0 30px rgba(0,0,0,.2); transform: translateX(105%);
+  transition: transform .22s ease; overflow-y: auto; padding: 20px 22px;
+}
+.drawer.open { transform: translateX(0); }
+.drawer h3 { display: flex; justify-content: space-between; align-items: center; }
+.drawer table.data { font-size: 12.5px; }
+.drawer .yearnav { display: flex; gap: 8px; margin-bottom: 10px; }
+
+footer.privacy {
+  max-width: 1180px; margin: 30px auto 0; padding: 0 22px 30px;
+  color: var(--text-muted); font-size: 12px;
+}
+
+/* ───────────────────────── print / PDF report ───────────────────────── */
+#report { display: none; }
+@media print {
+  :root {
+    color-scheme: light;
+    --page: #fff; --surface-1: #fff;
+    --text-primary: #0b0b0b; --text-secondary: #52514e; --text-muted: #898781;
+    --grid: #e1e0d9; --baseline: #c3c2b7; --border: rgba(11,11,11,.14);
+    --accent: #2a78d6; --accent-soft: rgba(42,120,214,.08);
+    --good-text: #006300;
+    --s1:#2a78d6; --s2:#eb6834; --s3:#1baf7a; --s4:#eda100;
+    --s5:#e87ba4; --s6:#008300; --s7:#4a3aa7; --s8:#e34948;
+  }
+  body { background: #fff; font-size: 12px; }
+  .app-header, .tabs, main, footer.privacy, .viz-tooltip, .drawer, .modal-back { display: none !important; }
+  #report { display: block; padding: 0 6mm; }
+  #report .rpt-page { page-break-after: always; }
+  #report .rpt-page:last-child { page-break-after: auto; }
+  #report h1 { font-size: 26px; }
+  #report h2 { font-size: 17px; border-bottom: 1px solid var(--grid); padding-bottom: 4px; margin-top: 18px; }
+  #report table.data { font-size: 10.5px; }
+  #report table.data th, #report table.data td { padding: 3px 7px; }
+  #report .rpt-cover { padding-top: 70mm; }
+  #report .rpt-cover .sub { color: var(--text-secondary); font-size: 14px; }
+  #report .chart-legend { font-size: 11px; }
+  #report tr { page-break-inside: avoid; }
+}
+</style>
+</head>
+<body>
+
+<header class="app-header">
+  <div class="titleblock">
+    <h1 id="hdr-title">Financial plan</h1>
+    <div class="sub">Tax year __TAX_YEAR__ rules · prepared __BUILD_DATE__ · all data stays in this file</div>
+  </div>
+  <div class="toolbar">
+    <button class="btn" id="btn-load-json" title="Load an updated client-data.json">Load data…</button>
+    <button class="btn" id="btn-export-json" title="Save current data, assumptions and events as JSON">Save data</button>
+    <button class="btn" id="btn-export-csv">Export CSV</button>
+    <button class="btn primary" id="btn-report">PDF report</button>
+    <input type="file" id="file-input" accept=".json,application/json" style="display:none">
+  </div>
+</header>
+
+<nav class="tabs" id="tabs">
+  <button data-tab="overview" class="active">Overview</button>
+  <button data-tab="tax">Tax</button>
+  <button data-tab="networth">Net worth</button>
+  <button data-tab="cashflow">Cash flow</button>
+  <button data-tab="whatif">What-if</button>
+  <button data-tab="assumptions">Assumptions</button>
+  <button data-tab="data">Data</button>
+</nav>
+
+<main>
+  <section class="tabpane active" id="pane-overview">
+    <div class="tiles" id="ov-tiles"></div>
+    <div class="card">
+      <h2>Net worth over your lifetime</h2>
+      <p class="cardnote">Assets stacked by holding, net worth after liabilities shown as the line. Hover for values; the dashed line is the baseline when what-if events are on.</p>
+      <div class="chartbox" id="ov-chart"></div>
+    </div>
+    <div class="card" id="ov-summary"></div>
+  </section>
+
+  <section class="tabpane" id="pane-tax">
+    <div class="card">
+      <h2>Personal tax, year by year</h2>
+      <p class="cardnote">How the taxes you pay evolve under the wage-growth assumption. Change it here — every other chart and table updates too.</p>
+      <div class="controls" id="tax-controls"></div>
+      <div class="chartbox" id="tax-chart"></div>
+    </div>
+    <div class="card">
+      <h3 id="tax-table-title">Tax table</h3>
+      <div class="tablewrap" id="tax-table"></div>
+    </div>
+  </section>
+
+  <section class="tabpane" id="pane-networth">
+    <div class="card">
+      <h2>Net worth projection</h2>
+      <p class="cardnote">Each asset grows under its own assumption — edit the rates below and the chart recalculates.</p>
+      <div class="chartbox" id="nw-chart"></div>
+    </div>
+    <div class="card">
+      <h3>Growth assumptions by asset</h3>
+      <div class="tablewrap" id="nw-growth-table"></div>
+    </div>
+    <div class="card">
+      <h3>Balances by year</h3>
+      <div class="tablewrap" id="nw-table"></div>
+    </div>
+  </section>
+
+  <section class="tabpane" id="pane-cashflow">
+    <div class="card">
+      <h2>Lifetime cash flow</h2>
+      <p class="cardnote">Bars stack every source of money in; the dark line is everything going out (spending, tax, debt payments). Red markers flag shortfall years. <strong>Click any year</strong> for its full breakdown.</p>
+      <div class="chartbox" id="cf-chart"></div>
+    </div>
+    <div class="card">
+      <h3>Cash flow by year</h3>
+      <div class="tablewrap" id="cf-table"></div>
+    </div>
+  </section>
+
+  <section class="tabpane" id="pane-whatif">
+    <div class="grid2">
+      <div class="card">
+        <h2>Life events &amp; what-ifs</h2>
+        <p class="cardnote">Toggle events on and off to see the plan re-project instantly. Everything is editable.</p>
+        <div class="event-list" id="event-list"></div>
+        <p style="margin-top:12px"><button class="btn primary" id="btn-add-event">+ Add event</button></p>
+      </div>
+      <div class="card">
+        <h2>Impact vs baseline</h2>
+        <div class="tiles" id="wi-tiles" style="grid-template-columns:repeat(auto-fit,minmax(150px,1fr))"></div>
+        <div class="chartbox" id="wi-chart"></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="tabpane" id="pane-assumptions">
+    <div class="card">
+      <h2>Global assumptions</h2>
+      <div class="controls" id="as-globals"></div>
+      <p class="cardnote">Wage growth applies to employment and self-employment income; inflation drives spending, DB pensions and the State Pension floor. Withdrawal order when spending exceeds income: <span id="as-worder"></span>. Surplus is saved to: cash buffer first, then <span id="as-sorder"></span>.</p>
+    </div>
+    <div class="card">
+      <h3>Year-by-year overrides</h3>
+      <p class="cardnote">Leave a cell blank to use the global rate. Enter percentages, e.g. 2.5. These feed every chart and table, including the tax table's wage growth.</p>
+      <div class="tablewrap" id="as-overrides"></div>
+    </div>
+  </section>
+
+  <section class="tabpane" id="pane-data">
+    <div class="card">
+      <h2>Plan inputs</h2>
+      <p class="cardnote">Everything the projection is built from. To change these figures, use “Load data…” with an updated client-data.json, or model changes as what-if events.</p>
+      <div id="data-view"></div>
+    </div>
+  </section>
+</main>
+
+<footer class="privacy">
+  <strong>Privacy:</strong> this file is self-contained. It makes no network requests, stores nothing outside this
+  file, and all calculations run locally in your browser. Treat the file itself as confidential — it embeds the
+  client's financial data. <strong>Important:</strong> this is an illustrative cash-flow model, not financial advice;
+  projections depend on the assumptions shown, are not guaranteed, and tax rules may change.
+</footer>
+
+<div class="viz-tooltip" id="tooltip"></div>
+
+<div class="drawer" id="year-drawer"></div>
+
+<div class="modal-back" id="modal-back">
+  <div class="modal" id="modal"></div>
+</div>
+
+<div id="report"></div>
+
+<script>
+"use strict";
+/* Data injected at build time by build_plan.py */
+const CLIENT = /*__CLIENT_DATA__*/{};
+const TAX = /*__TAX_DATA__*/{};
+/* ═══════════════════════════ helpers ═══════════════════════════ */
+const $ = (sel, el) => (el || document).querySelector(sel);
+const $$ = (sel, el) => Array.from((el || document).querySelectorAll(sel));
+const el = (tag, attrs, ...children) => {
+  const node = document.createElement(tag);
+  if (attrs) for (const [k, v] of Object.entries(attrs)) {
+    if (k === "class") node.className = v;
+    else if (k.startsWith("on")) node.addEventListener(k.slice(2), v);
+    else if (k === "dataset") Object.assign(node.dataset, v);
+    else node.setAttribute(k, v);
+  }
+  for (const c of children) {
+    if (c == null) continue;
+    node.append(c.nodeType ? c : document.createTextNode(c));
+  }
+  return node;
+};
+const svgEl = (tag, attrs, ...children) => {
+  const node = document.createElementNS("http://www.w3.org/2000/svg", tag);
+  if (attrs) for (const [k, v] of Object.entries(attrs)) node.setAttribute(k, v);
+  for (const c of children) node.append(c);
+  return node;
+};
+const deepCopy = (o) => JSON.parse(JSON.stringify(o));
+const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+const sum = (arr) => arr.reduce((a, b) => a + b, 0);
+
+const GBP = new Intl.NumberFormat("en-GB", { style: "currency", currency: "GBP", maximumFractionDigits: 0 });
+const fmtGBP = (n) => (n < 0 ? "−" + GBP.format(Math.abs(n)) : GBP.format(n));
+const fmtCompact = (n) => {
+  const a = Math.abs(n), s = n < 0 ? "−" : "";
+  if (a >= 1e6) return s + "£" + (a / 1e6).toFixed(a >= 1e7 ? 0 : 1) + "M";
+  if (a >= 1e3) return s + "£" + Math.round(a / 1e3) + "k";
+  return s + "£" + Math.round(a);
+};
+const fmtPct = (r) => (r * 100).toFixed(1).replace(/\.0$/, "") + "%";
+
+/* asset type → categorical slot & label (stack order = slot order) */
+const ASSET_SLOTS = { cash: 1, isa: 2, pension: 3, property: 4, gia: 5, other: 6, business: 7 };
+const ASSET_TYPE_LABEL = { cash: "Cash", isa: "ISA", pension: "Pension", property: "Property", gia: "Investment (GIA)", other: "Other", business: "Business" };
+const slotOf = (asset) => ASSET_SLOTS[asset.type] || 6;
+/* one distinct colour per asset: preferred slot by type, next free slot on collision */
+function computeAssetSlots(d) {
+  const used = new Set(), map = {};
+  for (const a of [...d.assets].sort((x, y) => slotOf(x) - slotOf(y))) {
+    let s = slotOf(a);
+    if (used.has(s)) { s = 1; while (used.has(s) && s < 8) s++; }
+    used.add(s); map[a.id] = s;
+  }
+  return map;
+}
+const slotFor = (id) => state.assetSlots[id] || 4;
+
+/* ═══════════════════════════ state ═══════════════════════════ */
+const state = {
+  data: deepCopy(CLIENT),
+  activeTab: "overview",
+  taxPerson: null,          // person id shown in tax tab
+  selectedYear: null,       // index into projection rows
+  perYearWage: false,       // tax-tab year-by-year wage editing on
+  proj: null,               // scenario projection (enabled events applied)
+  base: null,               // baseline projection (no events)
+};
+state.data.events = state.data.events || [];
+state.data.assumptions.yearOverrides = state.data.assumptions.yearOverrides || {};
+state.taxPerson = state.data.people[0].id;
+
+const startYear = parseInt(String(state.data.plan.startTaxYear || TAX.taxYear).slice(0, 4), 10) || new Date().getFullYear();
+const birthYear = (p) => parseInt(p.dateOfBirth.slice(0, 4), 10);
+const ageIn = (p, yearIdx) => startYear + yearIdx - birthYear(p);
+function planYears() {
+  const d = state.data;
+  return Math.max(...d.people.map((p) => (d.plan.endAge - ageIn(p, 0)))) + 1;
+}
+const taxYearLabel = (i) => `${startYear + i}/${String(startYear + i + 1).slice(2)}`;
+
+/* year-override lookup: overrides[i] = {inflation, wageGrowth, growth:{assetId:rate}} */
+function ovr(yearIdx) { return state.data.assumptions.yearOverrides[String(yearIdx)] || {}; }
+function inflationFor(i) { const o = ovr(i); return o.inflation != null ? o.inflation : state.data.assumptions.inflation; }
+function wageGrowthFor(i) { const o = ovr(i); return o.wageGrowth != null ? o.wageGrowth : state.data.assumptions.wageGrowth; }
+function assetGrowthFor(asset, i) {
+  const o = ovr(i);
+  if (o.growth && o.growth[asset.id] != null) return o.growth[asset.id];
+  return asset.growthRate != null ? asset.growthRate : 0.04;
+}
+const cumFactor = (rateFn, uptoIdx) => { let f = 1; for (let i = 1; i <= uptoIdx; i++) f *= 1 + rateFn(i); return f; };
+
+/* ═══════════════════════════ UK tax engine ═══════════════════════════ */
+/* Core income tax + NI for one person-year. All approximations documented in SKILL.md. */
+function taxCore(inp) {
+  const IT = TAX.incomeTax, NI = TAX.nationalInsurance, DV = TAX.dividends, SV = TAX.savings;
+  const nonSavings = Math.max(0, inp.nonSavings);          // employment (after net-pay pension), SE, pensions, rental
+  const savings = Math.max(0, inp.savings || 0);
+  const dividends = Math.max(0, inp.dividends || 0);
+  const total = nonSavings + savings + dividends;
+
+  const ani = Math.max(0, total - (inp.reliefDeduction || 0)); // adjusted net income
+  let pa = IT.personalAllowance;
+  if (ani > IT.paTaperThreshold) pa = Math.max(0, pa - (ani - IT.paTaperThreshold) * IT.paTaperRate);
+
+  // allowance is set against non-savings first, then savings, then dividends
+  let paLeft = pa;
+  const nsTaxable = Math.max(0, nonSavings - paLeft); paLeft = Math.max(0, paLeft - nonSavings);
+  const svTaxable = Math.max(0, savings - paLeft);    paLeft = Math.max(0, paLeft - savings);
+  const dvTaxable = Math.max(0, dividends - paLeft);
+
+  const bands = IT.bands; // taxable-income cumulative limits
+  let used = 0, incomeTax = 0;
+  const bandBreak = { basic: 0, higher: 0, additional: 0 };
+  const bandKey = ["basic", "higher", "additional"];
+  const fill = (amount, rateFn) => {
+    let left = amount, tax = 0;
+    for (let b = 0; b < bands.length && left > 0; b++) {
+      const cap = bands[b].upToTaxable == null ? Infinity : bands[b].upToTaxable;
+      const room = Math.max(0, cap - used);
+      const take = Math.min(room, left);
+      if (take > 0) {
+        const t = take * rateFn(b);
+        tax += t; bandBreak[bandKey[b]] += t;
+        used += take; left -= take;
+      }
+    }
+    return tax;
+  };
+
+  // non-savings
+  incomeTax += fill(nsTaxable, (b) => bands[b].rate);
+
+  // savings: starting rate band then PSA (both 0% but consume the band)
+  const startingRoom = Math.max(0, SV.startingRateBand - nsTaxable);
+  const totalTaxable = nsTaxable + svTaxable + dvTaxable;
+  const bandOfPerson = totalTaxable > bands[1].upToTaxable ? "additional" : totalTaxable > bands[0].upToTaxable ? "higher" : "basic";
+  const psa = SV.personalSavingsAllowance[bandOfPerson];
+  let svLeft = svTaxable;
+  const zeroSv = Math.min(svLeft, startingRoom + psa);
+  fill(zeroSv, () => 0); svLeft -= zeroSv;
+  incomeTax += fill(svLeft, (b) => bands[b].rate);
+
+  // dividends: allowance at 0% (consumes band), rest at dividend band rates
+  let dvLeft = dvTaxable;
+  const zeroDv = Math.min(dvLeft, DV.allowance);
+  fill(zeroDv, () => 0); dvLeft -= zeroDv;
+  const dividendTax = fill(dvLeft, (b) => DV.rates[bandKey[b]]);
+  incomeTax += dividendTax;
+
+  // National Insurance
+  let ni = 0;
+  const c1 = NI.class1, empl = Math.max(0, inp.employmentForNI || 0);
+  ni += Math.max(0, Math.min(empl, c1.upperEarningsLimit) - c1.primaryThreshold) * c1.mainRate;
+  ni += Math.max(0, empl - c1.upperEarningsLimit) * c1.upperRate;
+  const c4 = NI.class4, se = Math.max(0, inp.seProfitsForNI || 0);
+  ni += Math.max(0, Math.min(se, c4.upperProfitsLimit) - c4.lowerProfitsLimit) * c4.mainRate;
+  ni += Math.max(0, se - c4.upperProfitsLimit) * c4.upperRate;
+
+  return {
+    incomeTax: incomeTax - dividendTax, dividendTax, ni,
+    total: incomeTax + ni, personalAllowance: pa, ani, band: bandOfPerson, bandBreak,
+    taxableTotal: totalTaxable,
+  };
+}
+
+/* marginal rate on extra £1 of non-savings (pension drawdown) income */
+function marginalRate(inp) {
+  const base = taxCore(inp);
+  const bumped = taxCore({ ...inp, nonSavings: inp.nonSavings + 1000 });
+  return (bumped.incomeTax + bumped.dividendTax - base.incomeTax - base.dividendTax) / 1000;
+}
+
+/* ═══════════════════ what-if events → modifiers ═══════════════════ */
+const EVENT_TEMPLATES = {
+  retireEarly: {
+    name: "Change retirement age", group: "Retirement & income",
+    desc: "Retire earlier or later — employment stops and drawdown begins at the new age.",
+    fields: [
+      { key: "personId", label: "Who", type: "person" },
+      { key: "newRetirementAge", label: "New retirement age", type: "number", def: 60 },
+    ],
+    describe: (p, d) => `${personName(d, p.personId)} retires at ${p.newRetirementAge}`,
+  },
+  salaryChange: {
+    name: "Salary change / promotion", group: "Retirement & income",
+    desc: "Set a new salary level from a chosen age.",
+    fields: [
+      { key: "incomeId", label: "Income", type: "income" },
+      { key: "fromAge", label: "From owner's age", type: "number", def: 50 },
+      { key: "newAnnual", label: "New annual amount (today's £)", type: "number", def: 60000 },
+    ],
+    describe: (p, d) => `${incomeName(d, p.incomeId)} becomes ${fmtGBP(p.newAnnual)} from age ${p.fromAge}`,
+  },
+  careerBreak: {
+    name: "Career break", group: "Retirement & income",
+    desc: "Pause an income for a number of years.",
+    fields: [
+      { key: "incomeId", label: "Income", type: "income" },
+      { key: "fromAge", label: "From owner's age", type: "number", def: 48 },
+      { key: "years", label: "Years off", type: "number", def: 2 },
+    ],
+    describe: (p, d) => `${incomeName(d, p.incomeId)} paused for ${p.years} yrs from age ${p.fromAge}`,
+  },
+  newPension: {
+    name: "Start / raise pension saving", group: "Retirement & income",
+    desc: "Extra annual pension contribution (with tax relief) into a chosen pot.",
+    fields: [
+      { key: "assetId", label: "Pension pot", type: "asset:pension" },
+      { key: "fromAge", label: "From owner's age", type: "number", def: 45 },
+      { key: "toAge", label: "Until age", type: "number", def: 65 },
+      { key: "annual", label: "Extra per year", type: "number", def: 5000 },
+    ],
+    describe: (p, d) => `${fmtGBP(p.annual)}/yr extra into ${assetName(d, p.assetId)}, age ${p.fromAge}–${p.toAge}`,
+  },
+  buyProperty: {
+    name: "Buy a property", group: "Property & purchases",
+    desc: "New property with a deposit taken from savings and an optional mortgage.",
+    fields: [
+      { key: "year", label: "Plan year", type: "year" },
+      { key: "price", label: "Price", type: "number", def: 300000 },
+      { key: "deposit", label: "Deposit (from savings)", type: "number", def: 60000 },
+      { key: "otherCosts", label: "Stamp duty & costs", type: "number", def: 8000 },
+      { key: "rate", label: "Mortgage rate %", type: "pct", def: 4.5 },
+      { key: "termYears", label: "Mortgage term (years)", type: "number", def: 20 },
+      { key: "growth", label: "Property growth %/yr", type: "pct", def: 3 },
+    ],
+    describe: (p) => `Buy for ${fmtGBP(p.price)} (deposit ${fmtGBP(p.deposit)})`,
+  },
+  sellProperty: {
+    name: "Sell / downsize property", group: "Property & purchases",
+    desc: "Sell a property, repay its mortgage, keep the proceeds (optionally buy a cheaper one).",
+    fields: [
+      { key: "assetId", label: "Property", type: "asset:property" },
+      { key: "year", label: "Plan year", type: "year" },
+      { key: "newHomePrice", label: "New home price (0 = none)", type: "number", def: 0 },
+      { key: "costs", label: "Moving & sale costs", type: "number", def: 10000 },
+    ],
+    describe: (p, d) => `Sell ${assetName(d, p.assetId)}${p.newHomePrice ? ", buy for " + fmtGBP(p.newHomePrice) : ""}`,
+  },
+  majorPurchase: {
+    name: "Major purchase / renovation", group: "Property & purchases",
+    desc: "One-off cost (car, renovation, wedding…) paid from savings.",
+    fields: [
+      { key: "name2", label: "What", type: "text", def: "New car" },
+      { key: "year", label: "Plan year", type: "year" },
+      { key: "amount", label: "Cost (today's £)", type: "number", def: 25000 },
+      { key: "repeatEvery", label: "Repeat every N years (0 = once)", type: "number", def: 0 },
+    ],
+    describe: (p) => `${p.name2 || "Purchase"}: ${fmtGBP(p.amount)}${p.repeatEvery ? " every " + p.repeatEvery + " yrs" : ""}`,
+  },
+  windfall: {
+    name: "Inheritance / windfall", group: "Windfalls & one-offs",
+    desc: "Lump sum received into savings in a chosen year.",
+    fields: [
+      { key: "year", label: "Plan year", type: "year" },
+      { key: "amount", label: "Amount", type: "number", def: 100000 },
+    ],
+    describe: (p) => `${fmtGBP(p.amount)} received`,
+  },
+  schoolFees: {
+    name: "School / university fees", group: "Windfalls & one-offs",
+    desc: "Recurring fees for a set period, rising with inflation.",
+    fields: [
+      { key: "name2", label: "Label", type: "text", def: "School fees" },
+      { key: "year", label: "Starts (plan year)", type: "year" },
+      { key: "years", label: "Number of years", type: "number", def: 7 },
+      { key: "annual", label: "Per year (today's £)", type: "number", def: 15000 },
+    ],
+    describe: (p) => `${p.name2 || "Fees"}: ${fmtGBP(p.annual)}/yr for ${p.years} yrs`,
+  },
+  gift: {
+    name: "Gift to family", group: "Windfalls & one-offs",
+    desc: "Give a lump sum away (e.g. house deposit for children).",
+    fields: [
+      { key: "year", label: "Plan year", type: "year" },
+      { key: "amount", label: "Amount", type: "number", def: 30000 },
+    ],
+    describe: (p) => `Gift ${fmtGBP(p.amount)}`,
+  },
+  death: {
+    name: "Death of a person", group: "Risk events",
+    desc: "Their income stops, assets pass to the survivor, spending reduces.",
+    fields: [
+      { key: "personId", label: "Who", type: "person" },
+      { key: "atAge", label: "At age", type: "number", def: 70 },
+      { key: "spendFactor", label: "Household spending becomes %", type: "pct", def: 75 },
+      { key: "lifeCover", label: "Life cover paid out", type: "number", def: 0 },
+    ],
+    describe: (p, d) => `${personName(d, p.personId)} dies at ${p.atAge}`,
+  },
+  redundancy: {
+    name: "Redundancy / income gap", group: "Risk events",
+    desc: "Employment stops for a period, with an optional redundancy payment.",
+    fields: [
+      { key: "incomeId", label: "Income", type: "income" },
+      { key: "fromAge", label: "From owner's age", type: "number", def: 55 },
+      { key: "years", label: "Years out of work", type: "number", def: 1 },
+      { key: "payout", label: "Redundancy payment", type: "number", def: 20000 },
+    ],
+    describe: (p, d) => `${incomeName(d, p.incomeId)} stops for ${p.years} yr(s) at age ${p.fromAge}`,
+  },
+  careCosts: {
+    name: "Long-term care costs", group: "Risk events",
+    desc: "Care fees from a chosen age until end of plan, rising with inflation.",
+    fields: [
+      { key: "personId", label: "Who", type: "person" },
+      { key: "fromAge", label: "From age", type: "number", def: 85 },
+      { key: "annual", label: "Per year (today's £)", type: "number", def: 60000 },
+    ],
+    describe: (p, d) => `Care for ${personName(d, p.personId)}: ${fmtGBP(p.annual)}/yr from ${p.fromAge}`,
+  },
+  custom: {
+    name: "Custom event", group: "Custom",
+    desc: "Any recurring or one-off change to income, spending or savings.",
+    fields: [
+      { key: "name2", label: "Name", type: "text", def: "Custom change" },
+      { key: "kind", label: "Kind", type: "select", options: ["extra income", "extra spending", "add to savings", "take from savings"], def: "extra spending" },
+      { key: "year", label: "Starts (plan year)", type: "year" },
+      { key: "years", label: "Number of years (1 = one-off)", type: "number", def: 1 },
+      { key: "annual", label: "Amount per year (today's £)", type: "number", def: 10000 },
+      { key: "taxable", label: "Taxable? (income only)", type: "select", options: ["no", "yes"], def: "no" },
+    ],
+    describe: (p) => `${p.name2 || "Custom"}: ${p.kind} ${fmtGBP(p.annual)}${p.years > 1 ? "/yr × " + p.years : ""}`,
+  },
+};
+
+function personName(d, id) { const p = d.people.find((x) => x.id === id); return p ? p.name.split(" ")[0] : id; }
+function incomeName(d, id) { const i = d.incomes.find((x) => x.id === id); return i ? i.name : id; }
+function assetName(d, id) { const a = d.assets.find((x) => x.id === id); return a ? a.name : id; }
+
+/* Compile enabled events into modifiers the engine consumes. */
+function compileEvents(d, events) {
+  const m = {
+    retirementAge: {},                    // personId → age
+    deathYear: {},                        // personId → yearIdx of death
+    spendFactorFrom: null,                // {yearIdx, factor}
+    incomeStops: [],                      // {incomeId, fromYear, toYear}
+    incomeSets: [],                       // {incomeId, fromYear, annualToday}
+    extraSpend: [],                       // {name, yearFrom, yearTo, annualToday}
+    lumps: [],                            // {yearIdx, amount(+in/−out), name}
+    extraPension: [],                     // {assetId, yearFrom, yearTo, annualToday}
+    newAssets: [],                        // {yearIdx, asset, liability}
+    sellAsset: [],                        // {assetId, yearIdx, newHomePrice, costs}
+    extraIncome: [],                      // {name, yearFrom, yearTo, annualToday, taxable, ownerId}
+  };
+  const yearOfAge = (personId, age) => {
+    const p = d.people.find((x) => x.id === personId);
+    return p ? age - ageIn(p, 0) : 0;
+  };
+  const ownerYear = (incomeId, age) => {
+    const inc = d.incomes.find((x) => x.id === incomeId);
+    return inc ? yearOfAge(inc.ownerId, age) : 0;
+  };
+  for (const ev of events) {
+    if (!ev.enabled) continue;
+    const p = ev.params || {};
+    switch (ev.template) {
+      case "retireEarly": m.retirementAge[p.personId] = p.newRetirementAge; break;
+      case "salaryChange": m.incomeSets.push({ incomeId: p.incomeId, fromYear: ownerYear(p.incomeId, p.fromAge), annualToday: p.newAnnual }); break;
+      case "careerBreak": m.incomeStops.push({ incomeId: p.incomeId, fromYear: ownerYear(p.incomeId, p.fromAge), toYear: ownerYear(p.incomeId, p.fromAge) + p.years - 1 }); break;
+      case "newPension": {
+        const a = d.assets.find((x) => x.id === p.assetId);
+        const owner = a && a.ownerId !== "joint" ? a.ownerId : d.people[0].id;
+        m.extraPension.push({ assetId: p.assetId, yearFrom: yearOfAge(owner, p.fromAge), yearTo: yearOfAge(owner, p.toAge), annualToday: p.annual });
+        break;
+      }
+      case "buyProperty":
+        m.newAssets.push({
+          yearIdx: p.year,
+          asset: { id: "evt-prop-" + ev.id, ownerId: "joint", type: "property", name: "Property (what-if)", value: p.price, growthRate: (p.growth || 0) / 100 },
+          liability: p.price - p.deposit > 0 ? {
+            id: "evt-mort-" + ev.id, name: "Mortgage (what-if)", type: "mortgage",
+            balance: p.price - p.deposit, interestRate: (p.rate || 0) / 100,
+            annualPayment: annuityPayment(p.price - p.deposit, (p.rate || 0) / 100, p.termYears || 20),
+            linkedAssetId: "evt-prop-" + ev.id,
+          } : null,
+        });
+        m.lumps.push({ yearIdx: p.year, amount: -(p.deposit + (p.otherCosts || 0)), name: "Property purchase" });
+        break;
+      case "sellProperty": m.sellAsset.push({ assetId: p.assetId, yearIdx: p.year, newHomePrice: p.newHomePrice || 0, costs: p.costs || 0 }); break;
+      case "majorPurchase": {
+        const n = planYears();
+        for (let y = p.year; y < n; y += (p.repeatEvery || n + 1)) {
+          m.lumps.push({ yearIdx: y, amount: -p.amount, name: p.name2 || "Purchase", indexed: true });
+          if (!p.repeatEvery) break;
+        }
+        break;
+      }
+      case "windfall": m.lumps.push({ yearIdx: p.year, amount: p.amount, name: "Windfall" }); break;
+      case "schoolFees": m.extraSpend.push({ name: p.name2 || "Fees", yearFrom: p.year, yearTo: p.year + p.years - 1, annualToday: p.annual }); break;
+      case "gift": m.lumps.push({ yearIdx: p.year, amount: -p.amount, name: "Gift" }); break;
+      case "death": {
+        const y = yearOfAge(p.personId, p.atAge);
+        m.deathYear[p.personId] = y;
+        m.spendFactorFrom = { yearIdx: y, factor: (p.spendFactor || 75) / 100 };
+        if (p.lifeCover) m.lumps.push({ yearIdx: y, amount: p.lifeCover, name: "Life cover" });
+        break;
+      }
+      case "redundancy":
+        m.incomeStops.push({ incomeId: p.incomeId, fromYear: ownerYear(p.incomeId, p.fromAge), toYear: ownerYear(p.incomeId, p.fromAge) + p.years - 1 });
+        if (p.payout) m.lumps.push({ yearIdx: ownerYear(p.incomeId, p.fromAge), amount: p.payout, name: "Redundancy pay" });
+        break;
+      case "careCosts": m.extraSpend.push({ name: "Care costs", yearFrom: yearOfAge(p.personId, p.fromAge), yearTo: planYears() - 1, annualToday: p.annual }); break;
+      case "custom": {
+        const from = p.year, to = p.year + Math.max(1, p.years || 1) - 1;
+        if (p.kind === "extra income") m.extraIncome.push({ name: p.name2 || "Extra income", yearFrom: from, yearTo: to, annualToday: p.annual, taxable: p.taxable === "yes", ownerId: d.people[0].id });
+        else if (p.kind === "extra spending") m.extraSpend.push({ name: p.name2 || "Extra spending", yearFrom: from, yearTo: to, annualToday: p.annual });
+        else if (p.kind === "add to savings") for (let y = from; y <= to; y++) m.lumps.push({ yearIdx: y, amount: p.annual, name: p.name2 || "Saving", indexed: true });
+        else for (let y = from; y <= to; y++) m.lumps.push({ yearIdx: y, amount: -p.annual, name: p.name2 || "Withdrawal", indexed: true });
+        break;
+      }
+    }
+  }
+  return m;
+}
+
+function annuityPayment(principal, rate, years) {
+  if (!rate) return principal / years;
+  return principal * rate / (1 - Math.pow(1 + rate, -years));
+}
+
+/* ═══════════════════════════ projection engine ═══════════════════════════ */
+function runProjection(d, events) {
+  const mods = compileEvents(d, events || []);
+  const n = planYears();
+  const rows = [];
+
+  // working copies of balances
+  const assets = d.assets.map((a) => ({ ...a, bal: a.value, basis: a.type === "gia" ? a.value : 0 }));
+  const liabs = (d.liabilities || []).map((l) => ({ ...l, bal: l.balance }));
+  const alive = {}; d.people.forEach((p) => (alive[p.id] = true));
+  const retAge = (p) => mods.retirementAge[p.id] != null ? mods.retirementAge[p.id] : p.retirementAge;
+  const spTL = (i) => Math.max(0.025, inflationFor(i), wageGrowthFor(i)); // triple-lock proxy
+
+  let cbLumpNames = [];
+  for (let i = 0; i < n; i++) {
+    const infl = cumFactor(inflationFor, i);
+    const wage = cumFactor(wageGrowthFor, i);
+    const spFactor = (() => { let f = 1; for (let y = 1; y <= i; y++) f *= 1 + spTL(y); return f; })();
+
+    // deaths this year
+    for (const [pid, dy] of Object.entries(mods.deathYear)) {
+      if (dy === i && alive[pid]) {
+        alive[pid] = false;
+        const survivor = d.people.find((x) => x.id !== pid && alive[x.id]);
+        for (const a of assets) if (a.ownerId === pid && survivor) a.ownerId = survivor.id; // pots pass across
+      }
+    }
+
+    // event: new assets / sales
+    for (const na of mods.newAssets) if (na.yearIdx === i) {
+      assets.push({ ...na.asset, bal: na.asset.value, basis: 0 });
+      if (na.liability) liabs.push({ ...na.liability, bal: na.liability.balance });
+    }
+    const saleProceeds = [];
+    for (const s of mods.sellAsset) if (s.yearIdx === i) {
+      const a = assets.find((x) => x.id === s.assetId && x.bal > 0);
+      if (a) {
+        let proceeds = a.bal - (s.costs || 0);
+        const lk = liabs.find((l) => l.linkedAssetId === a.id && l.bal > 0);
+        if (lk) { proceeds -= lk.bal; lk.bal = 0; }
+        a.bal = 0; a.sold = true;
+        if (s.newHomePrice) {
+          proceeds -= s.newHomePrice;
+          assets.push({ id: a.id + "-next", ownerId: a.ownerId, type: "property", name: "New home", value: s.newHomePrice, growthRate: a.growthRate, bal: s.newHomePrice, basis: 0, isMainResidence: a.isMainResidence });
+        }
+        saleProceeds.push(proceeds);
+      }
+    }
+
+    // ── incomes per person ──
+    const perPerson = {};
+    const incomeItems = []; // {name, ownerId, amount, kind, slot}
+    for (const p of d.people) {
+      perPerson[p.id] = { nonSavings: 0, savings: 0, dividends: 0, employmentForNI: 0, seProfitsForNI: 0, reliefDeduction: 0, gross: 0, items: [] };
+    }
+    const personAlive = (pid) => alive[pid];
+
+    for (const inc of d.incomes) {
+      if (!personAlive(inc.ownerId)) continue;
+      const p = d.people.find((x) => x.id === inc.ownerId);
+      const age = ageIn(p, i);
+      let startA = inc.startAge, endA = inc.endAge;
+      if (endA == null && (inc.type === "employment" || inc.type === "selfEmployment")) endA = retAge(p) - 1;
+      if (startA != null && age < startA) continue;
+      if (endA != null && age > endA) continue;
+
+      // event stops / sets
+      let stopped = false;
+      for (const s of mods.incomeStops) if (s.incomeId === inc.id && i >= s.fromYear && i <= s.toYear) stopped = true;
+      if (stopped) continue;
+
+      let baseAnnual = inc.grossAnnual;
+      let setFromYear = null;
+      for (const s of mods.incomeSets) if (s.incomeId === inc.id && i >= s.fromYear && (setFromYear == null || s.fromYear >= setFromYear)) { baseAnnual = s.annualToday; setFromYear = s.fromYear; }
+
+      const growFn = inc.growthRate != null ? () => inc.growthRate : (inc.type === "employment" || inc.type === "selfEmployment") ? wageGrowthFor : inflationFor;
+      let amount;
+      if (setFromYear != null) { let f = 1; for (let y = setFromYear + 1; y <= i; y++) f *= 1 + growFn(y); amount = baseAnnual * f; }
+      else amount = baseAnnual * cumFactor(growFn, i);
+      if (amount <= 0) continue;
+
+      const pp = perPerson[inc.ownerId];
+      pp.gross += amount;
+      pp.items.push({ name: inc.name, amount, type: inc.type });
+      if (inc.type === "dividend") pp.dividends += amount;
+      else pp.nonSavings += amount;
+      if (inc.type === "employment") pp.employmentForNI += amount;
+      if (inc.type === "selfEmployment") pp.seProfitsForNI += amount;
+      incomeItems.push({ name: inc.name, ownerId: inc.ownerId, amount, kind: inc.type });
+    }
+
+    // state pension
+    for (const p of d.people) {
+      if (!personAlive(p.id) || !p.receivesStatePension) continue;
+      const age = ageIn(p, i);
+      const spa = p.statePensionAge || TAX.pensions.statePensionAgeDefault;
+      if (age >= spa) {
+        const amount = TAX.pensions.statePensionWeekly * 52 * (p.statePensionProportion == null ? 1 : p.statePensionProportion) * spFactor;
+        const pp = perPerson[p.id];
+        pp.gross += amount; pp.nonSavings += amount;
+        pp.items.push({ name: "State Pension", amount, type: "statePension" });
+        incomeItems.push({ name: "State Pension (" + p.name.split(" ")[0] + ")", ownerId: p.id, amount, kind: "statePension" });
+      }
+    }
+
+    // event extra income
+    for (const xi of mods.extraIncome) if (i >= xi.yearFrom && i <= xi.yearTo) {
+      const amount = xi.annualToday * infl;
+      const pp = perPerson[xi.ownerId];
+      if (pp && xi.taxable) { pp.gross += amount; pp.nonSavings += amount; }
+      incomeItems.push({ name: xi.name, ownerId: xi.ownerId, amount, kind: "other" });
+      if (pp && !xi.taxable) pp.gross += 0; // untaxed: cash only
+      if (!xi.taxable) incomeItems[incomeItems.length - 1].untaxed = true;
+    }
+
+    // cash interest → savings income (owner, joint split)
+    for (const a of assets) {
+      if (a.type !== "cash" || a.bal <= 0) continue;
+      const interest = a.bal * assetGrowthFor(a, i);
+      shareOwners(d, a.ownerId, alive).forEach(([pid, share]) => { perPerson[pid].savings += interest * share; });
+    }
+
+    // ── pension contributions ──
+    let pensionContribTotal = 0, employerContribTotal = 0;
+    const contribByAsset = {};
+    for (const a of assets) {
+      if (a.type !== "pension") continue;
+      let member = 0, employer = 0;
+      const linked = a.linkedIncomeId && incomeItems.find((x) => x.name === incomeName(d, a.linkedIncomeId) && x.kind === "employment");
+      const linkedAmt = linked ? linked.amount : 0;
+      if (linkedAmt > 0) {
+        member += linkedAmt * (a.memberContributionPct || 0);
+        employer += linkedAmt * (a.employerContributionPct || 0);
+      }
+      const owner = d.people.find((x) => x.id === a.ownerId);
+      const ownerAge = owner ? ageIn(owner, i) : 99;
+      const contribEnd = a.contributionEndAge != null ? a.contributionEndAge : (owner ? retAge(owner) - 1 : 0);
+      if (a.annualContribution && owner && alive[owner.id] && ownerAge <= contribEnd) member += a.annualContribution * infl;
+      for (const xp of mods.extraPension) if (xp.assetId === a.id && i >= xp.yearFrom && i <= xp.yearTo) member += xp.annualToday * infl;
+
+      if (member || employer) {
+        contribByAsset[a.id] = (contribByAsset[a.id] || 0) + member + employer;
+        pensionContribTotal += member; employerContribTotal += employer;
+        const pp = perPerson[a.ownerId];
+        if (pp) {
+          if (a.salarySacrifice && linkedAmt > 0) {
+            const sac = Math.min(member, linkedAmt);
+            pp.nonSavings -= sac; pp.employmentForNI -= sac; pp.gross -= sac;
+          } else {
+            pp.nonSavings -= member;            // net-pay treatment: income (and ANI) already net of contribution
+          }
+        }
+      }
+    }
+
+    // ── tax per person ──
+    let taxTotal = 0;
+    for (const p of d.people) {
+      const pp = perPerson[p.id];
+      if (!alive[p.id]) { pp.tax = { incomeTax: 0, dividendTax: 0, ni: 0, total: 0, personalAllowance: 0, ani: 0, band: "basic", bandBreak: { basic: 0, higher: 0, additional: 0 } }; continue; }
+      pp.tax = taxCore(pp);
+      taxTotal += pp.tax.incomeTax + pp.tax.dividendTax + pp.tax.ni;
+    }
+
+    // HICBC — child benefit for children under 18, charged on higher-ANI person
+    let childBenefit = 0, hicbc = 0;
+    const kids = (d.children || []).filter((c) => startYear + i - parseInt(c.dateOfBirth.slice(0, 4), 10) < 18);
+    if (d.claimChildBenefit && kids.length) {
+      const cb = TAX.childBenefit;
+      childBenefit = (cb.firstChildWeekly + cb.otherChildWeekly * (kids.length - 1)) * 52 * infl / cumFactor(inflationFor, 0);
+      const anis = d.people.filter((p) => alive[p.id]).map((p) => perPerson[p.id].tax.ani);
+      const highest = Math.max(0, ...anis);
+      const frac = clamp((highest - cb.hicbcThreshold) / (cb.hicbcUpper - cb.hicbcThreshold), 0, 1);
+      hicbc = childBenefit * frac;
+      taxTotal += hicbc;
+    }
+
+    // ── spending ──
+    let spendTotal = 0; const spendItems = [];
+    const spendMult = mods.spendFactorFrom && i >= mods.spendFactorFrom.yearIdx ? mods.spendFactorFrom.factor : 1;
+    for (const ex of d.expenditure) {
+      const from = ex.startAge != null ? yearIdxOfHouseholdAge(d, ex.startAge) : 0;
+      const to = ex.endAge != null ? yearIdxOfHouseholdAge(d, ex.endAge) : n - 1;
+      if (i < from || i > to) continue;
+      const growFn = ex.growthRate != null ? () => ex.growthRate : inflationFor;
+      const amount = ex.annual * cumFactor(growFn, i) * spendMult;
+      spendTotal += amount; spendItems.push({ name: ex.name, amount });
+    }
+    for (const xs of mods.extraSpend) if (i >= xs.yearFrom && i <= xs.yearTo) {
+      const amount = xs.annualToday * infl;
+      spendTotal += amount; spendItems.push({ name: xs.name, amount, event: true });
+    }
+
+    // ── debt payments ──
+    let debtPay = 0, debtInterest = 0;
+    for (const l of liabs) {
+      if (l.bal <= 0) continue;
+      const interest = l.bal * (l.interestRate || 0);
+      const pay = Math.min(l.bal + interest, l.annualPayment || 0);
+      l.bal = Math.max(0, l.bal + interest - pay);
+      debtPay += pay; debtInterest += interest;
+    }
+
+    // ── asset growth (non-cash growth; cash interest added here too) ──
+    for (const a of assets) {
+      if (a.bal <= 0) continue;
+      a.bal *= 1 + assetGrowthFor(a, i);
+    }
+
+    // ── planned contributions into non-pension assets ──
+    let plannedSavings = 0;
+    for (const a of assets) {
+      if (a.type === "pension") { if (contribByAsset[a.id]) a.bal += contribByAsset[a.id]; continue; }
+      const owner = a.ownerId === "joint" ? d.people[0] : d.people.find((x) => x.id === a.ownerId);
+      const ownerAge = owner ? ageIn(owner, i) : 99;
+      const contribEnd = a.contributionEndAge != null ? a.contributionEndAge : (owner ? retAge(owner) - 1 : -1);
+      if (a.annualContribution && ownerAge <= contribEnd && (!owner || alive[owner.id] || a.ownerId === "joint")) {
+        const c = a.annualContribution * infl;
+        a.bal += c; if (a.type === "gia") a.basis += c;
+        plannedSavings += c;
+      }
+    }
+
+    // ── event lumps ──
+    let lumpIn = 0, lumpOut = 0; const lumpNames = [];
+    for (const lp of mods.lumps) if (lp.yearIdx === i) {
+      const amt = lp.amount * (lp.indexed ? infl : 1);
+      if (amt >= 0) lumpIn += amt; else lumpOut += -amt;
+      lumpNames.push(lp.name);
+    }
+    lumpIn += sum(saleProceeds.filter((x) => x > 0));
+    lumpOut += sum(saleProceeds.filter((x) => x < 0).map((x) => -x));
+    cbLumpNames = lumpNames;
+
+    // ── household cash flow ──
+    const grossIncome = sum(Object.values(perPerson).map((pp) => pp.gross));
+    const untaxedExtra = incomeItems.filter((x) => x.untaxed).reduce((a, b) => a + b.amount, 0);
+    const netIncome = grossIncome + untaxedExtra + childBenefit - taxTotal;
+    // member pension contributions leave the household's spendable cash:
+    const spendableIncome = netIncome - pensionContribTotal;
+
+    let flow = spendableIncome - spendTotal - debtPay - plannedSavings + lumpIn - lumpOut;
+
+    // ── withdrawals (deficit) or surplus allocation ──
+    let withdrawals = [], withdrawalTax = 0, cgtPaid = 0, shortfall = 0;
+    if (flow < -0.5) {
+      let need = -flow;
+      const order = d.assumptions.withdrawalOrder || ["cash", "gia", "isa", "pension"];
+      for (const typ of order) {
+        if (need <= 0.5) break;
+        for (const a of assets.filter((x) => x.type === typ && x.bal > 0).sort((x, y) => y.bal - x.bal)) {
+          if (need <= 0.5) break;
+          if (typ === "pension") {
+            const owner = d.people.find((x) => x.id === a.ownerId);
+            if (owner && alive[owner.id] && ageIn(owner, i) < (TAX.pensions.normalMinimumPensionAge || 57)) continue;
+            const pp = owner ? perPerson[owner.id] : null;
+            const marg = pp ? marginalRate(pp) : 0.2;
+            const tf = TAX.pensions.taxFreeProportion || 0.25;
+            let gross = Math.min(a.bal, need / (1 - (1 - tf) * marg));
+            // refine once with exact tax delta
+            if (pp) {
+              const base = taxCore(pp);
+              const withPen = taxCore({ ...pp, nonSavings: pp.nonSavings + gross * (1 - tf) });
+              const delta = (withPen.incomeTax + withPen.dividendTax) - (base.incomeTax + base.dividendTax);
+              const net = gross - delta;
+              if (net > 0 && Math.abs(net - Math.min(need, net)) >= 0) {
+                gross = Math.min(a.bal, gross * (Math.min(need, a.bal) / Math.max(net, 1)));
+              }
+              const withPen2 = taxCore({ ...pp, nonSavings: pp.nonSavings + gross * (1 - tf) });
+              const tax2 = (withPen2.incomeTax + withPen2.dividendTax) - (base.incomeTax + base.dividendTax);
+              pp.nonSavings += gross * (1 - tf);      // future marginal calcs see it
+              pp.tax = taxCore(pp);
+              withdrawalTax += tax2; taxTotal += tax2;
+              a.bal -= gross; need -= gross - tax2;
+              withdrawals.push({ name: a.name, amount: gross, type: typ });
+            } else {
+              a.bal -= gross; need -= gross * (1 - (1 - tf) * marg);
+              withdrawals.push({ name: a.name, amount: gross, type: typ });
+            }
+          } else if (typ === "gia") {
+            const w = Math.min(a.bal, need * 1.15);
+            const gainFrac = a.bal > 0 ? Math.max(0, (a.bal - a.basis) / a.bal) : 0;
+            const gain = w * gainFrac;
+            const owners = shareOwners(d, a.ownerId, alive);
+            let cgt = 0;
+            for (const [pid, share] of owners) {
+              const pp = perPerson[pid];
+              const taxableGain = Math.max(0, gain * share - TAX.capitalGains.annualExemptAmount);
+              const rate = pp && pp.tax.band !== "basic" ? TAX.capitalGains.rates.higher : TAX.capitalGains.rates.basic;
+              cgt += taxableGain * rate;
+            }
+            a.basis = Math.max(0, a.basis * (1 - w / Math.max(a.bal, 1)));
+            a.bal -= w; need -= w - cgt;
+            cgtPaid += cgt; taxTotal += cgt;
+            withdrawals.push({ name: a.name, amount: w, type: typ });
+          } else {
+            const floor = typ === "cash" ? 0 : 0;
+            const avail = Math.max(0, a.bal - floor);
+            const w = Math.min(avail, need);
+            a.bal -= w; need -= w;
+            if (w > 0) withdrawals.push({ name: a.name, amount: w, type: typ });
+          }
+        }
+      }
+      shortfall = Math.max(0, need);
+      flow = 0;
+    } else if (flow > 0.5) {
+      let surplus = flow;
+      // top up cash buffer first
+      const buffer = (d.assumptions.cashBufferTarget || 0) * infl;
+      const cashAssets = assets.filter((a) => a.type === "cash");
+      if (cashAssets.length) {
+        const totCash = sum(cashAssets.map((a) => a.bal));
+        const top = clamp(buffer - totCash, 0, surplus);
+        if (top > 0) { cashAssets[0].bal += top; surplus -= top; }
+      }
+      const adults = d.people.filter((p) => alive[p.id]).length || 1;
+      let isaRoom = TAX.isa.annualAllowance * adults;
+      for (const typ of d.assumptions.surplusOrder || ["isa", "gia", "cash"]) {
+        if (surplus <= 0.5) break;
+        const pool = assets.filter((a) => a.type === typ && !a.sold);
+        if (!pool.length) continue;
+        let put = surplus;
+        if (typ === "isa") put = Math.min(put, isaRoom);
+        if (put <= 0) continue;
+        pool[0].bal += put; if (typ === "gia") pool[0].basis += put;
+        if (typ === "isa") isaRoom -= put;
+        surplus -= put;
+      }
+      if (surplus > 0.5 && cashAssets.length) { cashAssets[0].bal += surplus; surplus = 0; }
+      flow = surplus;
+    }
+
+    // ── record row ──
+    const assetBals = {}; let assetTotal = 0;
+    for (const a of assets) { assetBals[a.id] = (assetBals[a.id] || 0) + Math.max(0, a.bal); assetTotal += Math.max(0, a.bal); }
+    const liabTotal = sum(liabs.map((l) => Math.max(0, l.bal)));
+
+    rows.push({
+      i, year: startYear + i, label: taxYearLabel(i),
+      ages: Object.fromEntries(d.people.map((p) => [p.id, ageIn(p, i)])),
+      alive: { ...alive },
+      perPerson: deepCopy(perPerson),
+      grossIncome, childBenefit, hicbc, taxTotal, withdrawalTax, cgtPaid,
+      netIncome: grossIncome + untaxedExtra + childBenefit - taxTotal,
+      spendTotal, spendItems, debtPay, debtInterest,
+      pensionContribTotal, employerContribTotal, plannedSavings,
+      incomeItems, withdrawals, lumpIn, lumpOut, lumpNames: [...cbLumpNames],
+      shortfall, surplusSaved: Math.max(0, flow),
+      assets: assetBals, assetTotal, liabTotal, netWorth: assetTotal - liabTotal,
+      inflFactor: infl,
+    });
+  }
+  return rows;
+}
+
+function shareOwners(d, ownerId, alive) {
+  if (ownerId === "joint") {
+    const live = d.people.filter((p) => alive[p.id]);
+    if (!live.length) return [[d.people[0].id, 1]];
+    return live.map((p) => [p.id, 1 / live.length]);
+  }
+  return [[ownerId, 1]];
+}
+function yearIdxOfHouseholdAge(d, age) { return age - ageIn(d.people[0], 0); }
+
+function recompute() {
+  state.assetSlots = computeAssetSlots(state.data);
+  state.base = runProjection(state.data, []);
+  const anyEvents = state.data.events.some((e) => e.enabled);
+  state.proj = anyEvents ? runProjection(state.data, state.data.events) : state.base;
+  renderAll();
+}
+
+/* ═══════════════════════════ chart library ═══════════════════════════ */
+const tooltip = $("#tooltip");
+function showTooltip(x, y, title, rows, totalRow) {
+  tooltip.textContent = "";
+  tooltip.append(el("div", { class: "tt-title" }, title));
+  for (const r of rows) {
+    const row = el("div", { class: "tt-row" });
+    const nm = el("span", { class: "nm" });
+    if (r.slot) nm.append(el("span", { class: "linekey", style: `background:var(--s${r.slot})` }));
+    nm.append(document.createTextNode(r.name));
+    row.append(nm, el("span", { class: "val" }, r.value));
+    tooltip.append(row);
+  }
+  if (totalRow) {
+    const row = el("div", { class: "tt-row tt-total" });
+    row.append(el("span", { class: "nm" }, totalRow.name), el("span", { class: "val" }, totalRow.value));
+    tooltip.append(row);
+  }
+  tooltip.style.display = "block";
+  const rect = tooltip.getBoundingClientRect();
+  let left = x + 16, top = y + 14;
+  if (left + rect.width > window.innerWidth - 8) left = x - rect.width - 14;
+  if (top + rect.height > window.innerHeight - 8) top = y - rect.height - 10;
+  tooltip.style.left = left + "px"; tooltip.style.top = top + "px";
+}
+function hideTooltip() { tooltip.style.display = "none"; }
+
+function niceTicks(maxV, count) {
+  if (maxV <= 0) return [0, 1];
+  const raw = maxV / count;
+  const mag = Math.pow(10, Math.floor(Math.log10(raw)));
+  const step = [1, 2, 2.5, 5, 10].map((m) => m * mag).find((s) => s >= raw) || 10 * mag;
+  const ticks = [];
+  for (let v = 0; v <= maxV + step * 0.001; v += step) ticks.push(v);
+  while (ticks[ticks.length - 1] < maxV) ticks.push(ticks[ticks.length - 1] + step);
+  return ticks;
+}
+
+/*
+ cfg: { mode: 'area'|'bar', series: [{id,name,slot,values[]}], labels: [xlabels], sublabels,
+        overlays: [{name, values, dashed, className}], markers: [{idx}], onClickYear(idx),
+        height, interactive, selectedIdx, tooltipTitle(idx) }
+*/
+function renderStackedChart(container, cfg) {
+  container.textContent = "";
+  const W = 960, H = cfg.height || 340;
+  const padL = 58, padR = 14, padT = 14, padB = 34;
+  const iw = W - padL - padR, ih = H - padT - padB;
+  const nPts = cfg.labels.length;
+  const series = cfg.series.filter((s) => s.values.some((v) => v > 0.5));
+  const stackTops = [];
+  let maxV = 0;
+  for (let i = 0; i < nPts; i++) {
+    let acc = 0;
+    for (const s of series) acc += Math.max(0, s.values[i]);
+    stackTops.push(acc);
+    maxV = Math.max(maxV, acc);
+  }
+  for (const o of cfg.overlays || []) maxV = Math.max(maxV, ...o.values);
+  if (maxV <= 0) maxV = 1;
+  const ticks = niceTicks(maxV, 4);
+  maxV = ticks[ticks.length - 1];
+  const xAt = (i) => padL + (nPts === 1 ? iw / 2 : (i * iw) / (nPts - 1));
+  const bandW = iw / Math.max(1, nPts);
+  const xBar = (i) => padL + i * bandW;
+  const yAt = (v) => padT + ih - (v / maxV) * ih;
+
+  const svg = svgEl("svg", { viewBox: `0 0 ${W} ${H}`, role: "img" });
+
+  // grid + ticks
+  for (const t of ticks) {
+    svg.append(svgEl("line", { x1: padL, x2: W - padR, y1: yAt(t), y2: yAt(t), class: t === 0 ? "axisline" : "gridline" }));
+    const txt = svgEl("text", { x: padL - 8, y: yAt(t) + 4, "text-anchor": "end", class: "ticktext" });
+    txt.textContent = fmtCompact(t);
+    svg.append(txt);
+  }
+  // x labels (every k-th)
+  const k = Math.ceil(nPts / 12);
+  for (let i = 0; i < nPts; i += k) {
+    const tx = svgEl("text", { x: cfg.mode === "bar" ? xBar(i) + bandW / 2 : xAt(i), y: H - padB + 16, "text-anchor": "middle", class: "ticktext" });
+    tx.textContent = cfg.labels[i];
+    svg.append(tx);
+    if (cfg.sublabels) {
+      const tx2 = svgEl("text", { x: cfg.mode === "bar" ? xBar(i) + bandW / 2 : xAt(i), y: H - padB + 28, "text-anchor": "middle", class: "ticktext" });
+      tx2.textContent = cfg.sublabels[i];
+      svg.append(tx2);
+    }
+  }
+
+  if (cfg.mode === "area") {
+    let below = new Array(nPts).fill(0);
+    for (const s of series) {
+      const above = below.map((b, i) => b + Math.max(0, s.values[i]));
+      let dTop = "", dBot = "";
+      for (let i = 0; i < nPts; i++) dTop += (i ? "L" : "M") + xAt(i).toFixed(1) + " " + yAt(above[i]).toFixed(1);
+      for (let i = nPts - 1; i >= 0; i--) dBot += "L" + xAt(i).toFixed(1) + " " + yAt(below[i]).toFixed(1);
+      svg.append(svgEl("path", { d: dTop + dBot + "Z", class: `fill-s${s.slot}`, "fill-opacity": "0.55" }));
+      svg.append(svgEl("path", { d: dTop, fill: "none", class: `stroke-s${s.slot}`, "stroke-width": "1.5" }));
+      below = above;
+    }
+  } else {
+    const gap = 2, segGap = 2;
+    for (let i = 0; i < nPts; i++) {
+      let yTop = yAt(0);
+      const bw = Math.min(24, Math.max(3, bandW - gap * 2));
+      const bx = xBar(i) + (bandW - bw) / 2;
+      let first = true;
+      for (const s of series) {
+        const v = Math.max(0, s.values[i]);
+        if (v <= 0) continue;
+        const h = (v / maxV) * ih;
+        const y = yTop - h;
+        const hh = Math.max(0, h - (first ? 0 : segGap));
+        const isTop = s === [...series].reverse().find((ss) => ss.values[i] > 0);
+        const r = isTop ? Math.min(4, bw / 2, hh) : 0;
+        const yy = y + (h - hh);
+        let dd;
+        if (r > 0) {
+          dd = `M${bx} ${yy + hh} L${bx} ${yy + r} Q${bx} ${yy} ${bx + r} ${yy} L${bx + bw - r} ${yy} Q${bx + bw} ${yy} ${bx + bw} ${yy + r} L${bx + bw} ${yy + hh} Z`;
+          svg.append(svgEl("path", { d: dd, class: `fill-s${s.slot}` }));
+        } else {
+          svg.append(svgEl("rect", { x: bx, y: yy, width: bw, height: hh, class: `fill-s${s.slot}` }));
+        }
+        yTop = y; first = false;
+      }
+    }
+  }
+
+  // overlays
+  for (const o of cfg.overlays || []) {
+    let dd = "";
+    for (let i = 0; i < o.values.length; i++) {
+      const x = cfg.mode === "bar" ? xBar(i) + bandW / 2 : xAt(i);
+      dd += (i ? "L" : "M") + x.toFixed(1) + " " + yAt(Math.max(0, o.values[i])).toFixed(1);
+    }
+    svg.append(svgEl("path", { d: dd, fill: "none", class: o.className || "overlayline", "stroke-width": "2", "stroke-linejoin": "round", "stroke-linecap": "round", ...(o.dashed ? { "stroke-dasharray": "5 4" } : {}) }));
+  }
+
+  // shortfall markers
+  for (const mk of cfg.markers || []) {
+    const x = cfg.mode === "bar" ? xBar(mk.idx) + bandW / 2 : xAt(mk.idx);
+    svg.append(svgEl("circle", { cx: x, cy: yAt(0) + 0, r: 4, class: "shortfall-dot" }));
+  }
+
+  // selection highlight
+  if (cfg.selectedIdx != null) {
+    const x = cfg.mode === "bar" ? xBar(cfg.selectedIdx) + bandW / 2 : xAt(cfg.selectedIdx);
+    svg.append(svgEl("line", { x1: x, x2: x, y1: padT, y2: yAt(0), class: "crosshair", "stroke-dasharray": "3 3", "stroke-width": "1.5" }));
+  }
+
+  // interaction
+  const cross = svgEl("line", { x1: 0, x2: 0, y1: padT, y2: yAt(0), class: "crosshair", visibility: "hidden" });
+  svg.append(cross);
+  const hit = svgEl("rect", { x: padL, y: padT, width: iw, height: ih, fill: "transparent", style: "cursor:crosshair" });
+  svg.append(hit);
+  const idxFromEvent = (evt) => {
+    const rect = svg.getBoundingClientRect();
+    const px = ((evt.clientX - rect.left) / rect.width) * W;
+    if (cfg.mode === "bar") return clamp(Math.floor((px - padL) / bandW), 0, nPts - 1);
+    return clamp(Math.round(((px - padL) / iw) * (nPts - 1)), 0, nPts - 1);
+  };
+  hit.addEventListener("pointermove", (evt) => {
+    const i = idxFromEvent(evt);
+    const x = cfg.mode === "bar" ? xBar(i) + bandW / 2 : xAt(i);
+    cross.setAttribute("x1", x); cross.setAttribute("x2", x);
+    cross.setAttribute("visibility", "visible");
+    const rows = [...series].reverse()
+      .filter((s) => s.values[i] > 0.5)
+      .map((s) => ({ name: s.name, value: fmtCompact(s.values[i]), slot: s.slot }));
+    for (const o of cfg.overlays || []) rows.push({ name: o.name, value: fmtCompact(o.values[i]) });
+    showTooltip(evt.clientX, evt.clientY, cfg.tooltipTitle ? cfg.tooltipTitle(i) : cfg.labels[i], rows,
+      cfg.totalLabel ? { name: cfg.totalLabel, value: fmtCompact(stackTops[i]) } : null);
+  });
+  hit.addEventListener("pointerleave", () => { cross.setAttribute("visibility", "hidden"); hideTooltip(); });
+  if (cfg.onClickYear) hit.addEventListener("click", (evt) => cfg.onClickYear(idxFromEvent(evt)));
+
+  container.append(svg);
+
+  // legend
+  if (series.length + (cfg.overlays || []).length > 1) {
+    const legend = el("div", { class: "chart-legend" });
+    for (const s of series) {
+      const item = el("span", { class: "item" });
+      item.append(el("span", { class: "swatch", style: `background:var(--s${s.slot})` }), s.name);
+      legend.append(item);
+    }
+    for (const o of cfg.overlays || []) {
+      const item = el("span", { class: "item" });
+      item.append(el("span", { class: "linekey", style: `background:${o.legendColor || "var(--text-primary)"};${o.dashed ? "opacity:.55" : ""}` }), o.name);
+      legend.append(item);
+    }
+    if ((cfg.markers || []).length) {
+      const item = el("span", { class: "item" });
+      item.append(el("span", { class: "swatch", style: "background:var(--critical);border-radius:50%" }), "Shortfall year");
+      legend.append(item);
+    }
+    container.append(legend);
+  }
+  return svg;
+}
+/* ═══════════════════════════ UI: tabs ═══════════════════════════ */
+$("#tabs").addEventListener("click", (e) => {
+  const btn = e.target.closest("button[data-tab]");
+  if (!btn) return;
+  state.activeTab = btn.dataset.tab;
+  $$("#tabs button").forEach((b) => b.classList.toggle("active", b === btn));
+  $$(".tabpane").forEach((p) => p.classList.toggle("active", p.id === "pane-" + state.activeTab));
+});
+
+/* ═══════════════════════════ render: overview ═══════════════════════════ */
+function firstShortfallYear(rows) { const r = rows.find((x) => x.shortfall > 0.5); return r || null; }
+function retirementRow(rows) {
+  const d = state.data;
+  const ages = d.people.map((p) => {
+    const ev = d.events.find((e) => e.enabled && e.template === "retireEarly" && e.params.personId === p.id);
+    return { p, age: ev ? ev.params.newRetirementAge : p.retirementAge };
+  });
+  const idx = Math.min(...ages.map(({ p, age }) => age - ageIn(p, 0)));
+  return rows[clamp(idx, 0, rows.length - 1)];
+}
+
+function tile(label, value, delta) {
+  const t = el("div", { class: "tile" });
+  t.append(el("div", { class: "label" }, label), el("div", { class: "value" }, value));
+  if (delta) t.append(el("div", { class: "delta " + (delta.dir || "") }, delta.text));
+  return t;
+}
+
+function renderOverview() {
+  const rows = state.proj, base = state.base, d = state.data;
+  const tiles = $("#ov-tiles"); tiles.textContent = "";
+  const now = rows[0], retire = retirementRow(rows), end = rows[rows.length - 1];
+  const sf = firstShortfallYear(rows);
+  const lifetimeTax = sum(rows.map((r) => r.taxTotal));
+  tiles.append(
+    tile("Net worth today", fmtCompact(now.netWorth)),
+    tile("At retirement (" + retire.label + ")", fmtCompact(retire.netWorth)),
+    tile("At end of plan (age " + d.plan.endAge + ")", fmtCompact(end.netWorth)),
+    tile("Lifetime tax paid", fmtCompact(lifetimeTax)),
+    tile("First shortfall", sf ? sf.label : "None", sf ? { text: "money runs short", dir: "down" } : { text: "plan fully funded", dir: "up" }),
+  );
+
+  renderNetWorthChart($("#ov-chart"), 300);
+
+  const s = $("#ov-summary"); s.textContent = "";
+  s.append(el("h2", null, "How to read this plan"));
+  const names = d.people.map((p) => p.name.split(" ")[0]).join(" & ");
+  const para = (t) => s.append(el("p", null, t));
+  para(`This plan projects ${names}'s finances from ${rows[0].label} until age ${d.plan.endAge}, using tax year __TAX_YEAR__ rules. Income is taxed per person each year; spending, saving and withdrawals are then balanced across the household.`);
+  para(`Assumptions: inflation ${fmtPct(d.assumptions.inflation)}, wage growth ${fmtPct(d.assumptions.wageGrowth)}, with each asset growing at its own rate (see Net worth tab). When spending exceeds income, money is drawn in this order: ${(d.assumptions.withdrawalOrder || []).map((t) => ASSET_TYPE_LABEL[t] || t).join(" → ")}.`);
+  const active = d.events.filter((e) => e.enabled);
+  if (active.length) para(`What-if events currently switched on: ${active.map((e) => e.name).join("; ")}. The dashed line on charts shows the baseline without them.`);
+  para("Every figure here is an illustration based on the stated assumptions — not a guarantee, and not financial advice.");
+}
+
+/* ═══════════════════════════ render: net worth ═══════════════════════════ */
+function assetSeries(rows) {
+  const d = state.data;
+  const ids = new Set();
+  rows.forEach((r) => Object.keys(r.assets).forEach((id) => ids.add(id)));
+  const meta = [];
+  for (const id of ids) {
+    const a = d.assets.find((x) => x.id === id) || { id, name: id.startsWith("evt-") ? "What-if asset" : id, type: "other" };
+    meta.push({ id, name: a.name, type: a.type || "other", slot: slotFor(id) });
+  }
+  meta.sort((a, b) => a.slot - b.slot || a.name.localeCompare(b.name));
+  return meta.map((m) => ({
+    id: m.id, name: m.name, slot: m.slot,
+    values: rows.map((r) => r.assets[m.id] || 0),
+  }));
+}
+
+function renderNetWorthChart(container, height) {
+  const rows = state.proj, base = state.base;
+  const overlays = [{ name: "Net worth (after debts)", values: rows.map((r) => r.netWorth) }];
+  if (rows !== base) overlays.push({ name: "Baseline net worth", values: base.map((r) => r.netWorth), dashed: true, legendColor: "var(--text-muted)" });
+  renderStackedChart(container, {
+    mode: "area",
+    series: assetSeries(rows),
+    labels: rows.map((r) => String(r.year)),
+    overlays,
+    height: height || 360,
+    tooltipTitle: (i) => rows[i].label + " · " + agesLabel(rows[i]),
+    totalLabel: "Total assets",
+    onClickYear: (i) => openYearDrawer(i),
+  });
+}
+
+function agesLabel(row) {
+  return state.data.people.filter((p) => row.alive[p.id]).map((p) => `${p.name.split(" ")[0]} ${row.ages[p.id]}`).join(", ");
+}
+
+function renderNetWorth() {
+  renderNetWorthChart($("#nw-chart"));
+
+  // growth assumptions editor
+  const gt = $("#nw-growth-table"); gt.textContent = "";
+  const tbl = el("table", { class: "data" });
+  tbl.append(el("thead", null, el("tr", null,
+    el("th", null, "Asset"), el("th", null, "Type"), el("th", null, "Value today"),
+    el("th", null, "Growth %/yr"), el("th", null, "Contribution /yr"))));
+  const tb = el("tbody");
+  for (const a of state.data.assets) {
+    const inp = el("input", { type: "number", step: "0.1", value: ((a.growthRate ?? 0.04) * 100).toFixed(1) });
+    inp.addEventListener("change", () => { a.growthRate = (parseFloat(inp.value) || 0) / 100; recompute(); });
+    const contribution = a.type === "pension" && a.linkedIncomeId
+      ? fmtPct(a.memberContributionPct || 0) + " + " + fmtPct(a.employerContributionPct || 0) + " er"
+      : fmtGBP(a.annualContribution || 0);
+    const nameCell = el("td", null);
+    nameCell.append(el("span", { class: "swatch", style: `background:var(--s${slotFor(a.id)})` }), a.name);
+    tb.append(el("tr", null,
+      nameCell,
+      el("td", null, ASSET_TYPE_LABEL[a.type] || a.type),
+      el("td", null, fmtGBP(a.value)),
+      el("td", null, inp),
+      el("td", null, contribution)));
+  }
+  tbl.append(tb); gt.append(tbl);
+
+  // balances table
+  const bt = $("#nw-table"); bt.textContent = "";
+  const series = assetSeries(state.proj);
+  const t2 = el("table", { class: "data" });
+  const hr = el("tr", null, el("th", null, "Year"), el("th", null, "Ages"));
+  series.forEach((s) => hr.append(el("th", null, s.name)));
+  hr.append(el("th", null, "Debts"), el("th", null, "Net worth"));
+  t2.append(el("thead", null, hr));
+  const tb2 = el("tbody");
+  state.proj.forEach((r, i) => {
+    const tr = el("tr", { dataset: { idx: i } }, el("td", null, r.label), el("td", null, agesLabel(r)));
+    series.forEach((s) => tr.append(el("td", null, s.values[i] > 0.5 ? fmtCompact(s.values[i]) : "—")));
+    tr.append(el("td", { class: r.liabTotal > 0.5 ? "neg" : "" }, r.liabTotal > 0.5 ? fmtCompact(-r.liabTotal) : "—"));
+    tr.append(el("td", null, fmtCompact(r.netWorth)));
+    tr.addEventListener("click", () => openYearDrawer(i));
+    tb2.append(tr);
+  });
+  t2.append(tb2); bt.append(t2);
+}
+
+/* ═══════════════════════════ render: tax ═══════════════════════════ */
+function renderTax() {
+  const d = state.data;
+  const controls = $("#tax-controls"); controls.textContent = "";
+
+  if (d.people.length > 1) {
+    const seg = el("div", { class: "seg" });
+    for (const p of d.people) {
+      const b = el("button", { class: state.taxPerson === p.id ? "active" : "" }, p.name.split(" ")[0]);
+      b.addEventListener("click", () => { state.taxPerson = p.id; renderTax(); });
+      seg.append(b);
+    }
+    const f = el("div", { class: "field" }, el("label", null, "Person"));
+    f.append(seg); controls.append(f);
+  }
+
+  const wg = el("input", { type: "number", step: "0.1", value: (d.assumptions.wageGrowth * 100).toFixed(1) });
+  wg.addEventListener("change", () => { d.assumptions.wageGrowth = (parseFloat(wg.value) || 0) / 100; recompute(); });
+  const f2 = el("div", { class: "field" }, el("label", null, "Wage growth %/yr"));
+  f2.append(wg); controls.append(f2);
+
+  const toggle = el("button", { class: "btn small" }, state.perYearWage ? "Hide year-by-year editing" : "Edit wage growth year-by-year");
+  toggle.addEventListener("click", () => { state.perYearWage = !state.perYearWage; renderTax(); });
+  const f3 = el("div", { class: "field" }, el("label", null, " "));
+  f3.append(toggle); controls.append(f3);
+
+  const person = d.people.find((p) => p.id === state.taxPerson) || d.people[0];
+  $("#tax-table-title").textContent = "Tax table — " + person.name;
+
+  // chart: stacked tax composition for selected person
+  const rows = state.proj;
+  const seriesDefs = [
+    { key: (r) => r.perPerson[person.id].tax.incomeTax, name: "Income tax", slot: 1 },
+    { key: (r) => r.perPerson[person.id].tax.ni, name: "National Insurance", slot: 3 },
+    { key: (r) => r.perPerson[person.id].tax.dividendTax, name: "Dividend tax", slot: 5 },
+    { key: (r) => hicbcShare(r, person.id), name: "Child benefit charge", slot: 4 },
+  ];
+  renderStackedChart($("#tax-chart"), {
+    mode: "bar",
+    series: seriesDefs.map((s, ix) => ({ id: "t" + ix, name: s.name, slot: s.slot, values: rows.map(s.key) })),
+    labels: rows.map((r) => String(r.year)),
+    height: 280,
+    tooltipTitle: (i) => rows[i].label + " · age " + rows[i].ages[person.id],
+    totalLabel: "Total tax",
+    onClickYear: (i) => openYearDrawer(i),
+  });
+
+  // table
+  const wrap = $("#tax-table"); wrap.textContent = "";
+  const tbl = el("table", { class: "data" });
+  const head = el("tr", null,
+    el("th", null, "Tax year"), el("th", null, "Age"));
+  if (state.perYearWage) head.append(el("th", null, "Wage growth %"));
+  ["Gross income", "Personal allowance", "Income tax", "Nat. Insurance", "Dividend tax", "CB charge", "Total tax", "Effective rate", "Take-home"]
+    .forEach((h) => head.append(el("th", null, h)));
+  tbl.append(el("thead", null, head));
+  const tb = el("tbody");
+  rows.forEach((r, i) => {
+    const pp = r.perPerson[person.id];
+    if (!r.alive[person.id]) return;
+    const t = pp.tax;
+    const hicbcP = hicbcShare(r, person.id);
+    const totalTax = t.incomeTax + t.ni + t.dividendTax + hicbcP;
+    const tr = el("tr", null,
+      el("td", null, r.label),
+      el("td", null, String(r.ages[person.id])));
+    if (state.perYearWage) {
+      const o = ovr(i);
+      const inp = el("input", { type: "number", step: "0.1", value: o.wageGrowth != null ? (o.wageGrowth * 100).toFixed(1) : "", placeholder: (d.assumptions.wageGrowth * 100).toFixed(1) });
+      inp.addEventListener("change", () => {
+        const yo = d.assumptions.yearOverrides;
+        yo[String(i)] = yo[String(i)] || {};
+        if (inp.value === "") delete yo[String(i)].wageGrowth; else yo[String(i)].wageGrowth = (parseFloat(inp.value) || 0) / 100;
+        recompute();
+      });
+      tr.append(el("td", null, inp));
+    }
+    tr.append(
+      el("td", null, fmtGBP(pp.gross)),
+      el("td", null, fmtGBP(t.personalAllowance)),
+      el("td", null, fmtGBP(t.incomeTax)),
+      el("td", null, fmtGBP(t.ni)),
+      el("td", null, t.dividendTax > 0.5 ? fmtGBP(t.dividendTax) : "—"),
+      el("td", null, hicbcP > 0.5 ? fmtGBP(hicbcP) : "—"),
+      el("td", null, fmtGBP(totalTax)),
+      el("td", null, pp.gross > 0 ? fmtPct(totalTax / pp.gross) : "—"),
+      el("td", null, fmtGBP(pp.gross - totalTax)),
+    );
+    tr.addEventListener("click", (e) => { if (e.target.tagName !== "INPUT") openYearDrawer(i); });
+    tb.append(tr);
+  });
+  tbl.append(tb); wrap.append(tbl);
+}
+
+function hicbcShare(r, personId) {
+  if (!r.hicbc) return 0;
+  // charged on the higher-ANI person
+  let maxId = null, maxAni = -1;
+  for (const [pid, pp] of Object.entries(r.perPerson)) {
+    if (r.alive[pid] && pp.tax.ani > maxAni) { maxAni = pp.tax.ani; maxId = pid; }
+  }
+  return maxId === personId ? r.hicbc : 0;
+}
+
+/* ═══════════════════════════ render: cash flow ═══════════════════════════ */
+const INCOME_KIND_META = [
+  ["employment", "Employment", 1],
+  ["selfEmployment", "Self-employment", 7],
+  ["statePension", "State Pension", 3],
+  ["dbPension", "DB pension", 6],
+  ["dividend", "Dividends", 5],
+  ["rental", "Rental", 4],
+  ["other", "Other income", 8],
+];
+function cashflowSeries(rows) {
+  const series = INCOME_KIND_META.map(([kind, name, slot]) => ({
+    id: kind, name, slot,
+    values: rows.map((r) => sum(r.incomeItems.filter((x) => (x.kind === kind) || (kind === "other" && !INCOME_KIND_META.some(([k2]) => k2 !== "other" && k2 === x.kind))).map((x) => x.amount))),
+  }));
+  series.push({ id: "wd", name: "Withdrawals from savings", slot: 2, values: rows.map((r) => sum(r.withdrawals.map((w) => w.amount))) });
+  series.push({ id: "lump", name: "One-off receipts", slot: 4, values: rows.map((r) => r.lumpIn) });
+  return series.filter((s) => s.values.some((v) => v > 0.5));
+}
+function outflowValues(rows) {
+  return rows.map((r) => r.spendTotal + r.taxTotal + r.debtPay + r.pensionContribTotal + r.plannedSavings + r.lumpOut);
+}
+
+function renderCashflow() {
+  const rows = state.proj;
+  renderStackedChart($("#cf-chart"), {
+    mode: "bar",
+    series: cashflowSeries(rows),
+    labels: rows.map((r) => String(r.year)),
+    overlays: [{ name: "Total outgoings (spend + tax + debt + saving)", values: outflowValues(rows) }],
+    markers: rows.map((r, i) => (r.shortfall > 0.5 ? { idx: i } : null)).filter(Boolean),
+    height: 360,
+    selectedIdx: state.selectedYear,
+    tooltipTitle: (i) => rows[i].label + " · " + agesLabel(rows[i]) + " · click for detail",
+    totalLabel: "Total in",
+    onClickYear: (i) => openYearDrawer(i),
+  });
+
+  const wrap = $("#cf-table"); wrap.textContent = "";
+  const tbl = el("table", { class: "data" });
+  tbl.append(el("thead", null, el("tr", null,
+    ...["Year", "Ages", "Gross income", "Tax", "Net income", "Spending", "Debt pay", "Saved", "Withdrawn", "Shortfall", "Net worth"].map((h) => el("th", null, h)))));
+  const tb = el("tbody");
+  rows.forEach((r, i) => {
+    const tr = el("tr", { class: (r.shortfall > 0.5 ? "shortfall " : "") + (state.selectedYear === i ? "selected" : ""), dataset: { idx: i } },
+      el("td", null, r.label),
+      el("td", null, agesLabel(r)),
+      el("td", null, fmtGBP(r.grossIncome + r.childBenefit)),
+      el("td", null, fmtGBP(r.taxTotal)),
+      el("td", null, fmtGBP(r.netIncome)),
+      el("td", null, fmtGBP(r.spendTotal)),
+      el("td", null, r.debtPay > 0.5 ? fmtGBP(r.debtPay) : "—"),
+      el("td", null, r.plannedSavings + r.surplusSaved + r.pensionContribTotal > 0.5 ? fmtGBP(r.plannedSavings + r.surplusSaved + r.pensionContribTotal) : "—"),
+      el("td", null, sum(r.withdrawals.map((w) => w.amount)) > 0.5 ? fmtGBP(sum(r.withdrawals.map((w) => w.amount))) : "—"),
+      el("td", { class: r.shortfall > 0.5 ? "neg" : "" }, r.shortfall > 0.5 ? fmtGBP(r.shortfall) : "—"),
+      el("td", null, fmtCompact(r.netWorth)));
+    tr.addEventListener("click", () => openYearDrawer(i));
+    tb.append(tr);
+  });
+  tbl.append(tb); wrap.append(tbl);
+}
+
+/* ═══════════════════════════ year drawer ═══════════════════════════ */
+function openYearDrawer(i) {
+  state.selectedYear = i;
+  const r = state.proj[i];
+  const dr = $("#year-drawer"); dr.textContent = "";
+
+  const title = el("h3", null);
+  title.append(el("span", null, r.label + " in detail"));
+  const close = el("button", { class: "btn small" }, "Close");
+  close.addEventListener("click", () => { dr.classList.remove("open"); state.selectedYear = null; renderCashflow(); });
+  title.append(close);
+  dr.append(title);
+
+  const nav = el("div", { class: "yearnav" });
+  const prev = el("button", { class: "btn small" }, "← " + (i > 0 ? state.proj[i - 1].label : ""));
+  prev.disabled = i === 0;
+  prev.addEventListener("click", () => openYearDrawer(i - 1));
+  const next = el("button", { class: "btn small" }, (i < state.proj.length - 1 ? state.proj[i + 1].label : "") + " →");
+  next.disabled = i === state.proj.length - 1;
+  next.addEventListener("click", () => openYearDrawer(i + 1));
+  nav.append(prev, next); dr.append(nav);
+
+  dr.append(el("p", { class: "cardnote" }, agesLabel(r) + (r.lumpNames.length ? " · events: " + r.lumpNames.join(", ") : "")));
+
+  const section = (name, rows2, totalName, totalVal) => {
+    dr.append(el("h3", { style: "margin-top:16px" }, name));
+    const t = el("table", { class: "data" }); const tb = el("tbody");
+    for (const [k, v] of rows2) tb.append(el("tr", null, el("td", null, k), el("td", null, v)));
+    if (totalName) {
+      const tr = el("tr", null, el("td", null, el("strong", null, totalName)), el("td", null, el("strong", null, totalVal)));
+      tb.append(tr);
+    }
+    t.append(tb); dr.append(t);
+  };
+
+  section("Money in",
+    [...r.incomeItems.map((x) => [x.name, fmtGBP(x.amount)]),
+     ...(r.childBenefit > 0.5 ? [["Child benefit", fmtGBP(r.childBenefit)]] : []),
+     ...r.withdrawals.map((w) => ["Withdrawal — " + w.name, fmtGBP(w.amount)]),
+     ...(r.lumpIn > 0.5 ? [["One-off receipts", fmtGBP(r.lumpIn)]] : [])],
+    "Total in", fmtGBP(r.grossIncome + r.childBenefit + sum(r.withdrawals.map((w) => w.amount)) + r.lumpIn));
+
+  const taxRows = [];
+  for (const p of state.data.people) {
+    if (!r.alive[p.id]) continue;
+    const t = r.perPerson[p.id].tax;
+    const nm = p.name.split(" ")[0];
+    if (t.incomeTax > 0.5) taxRows.push([nm + " — income tax", fmtGBP(t.incomeTax)]);
+    if (t.ni > 0.5) taxRows.push([nm + " — National Insurance", fmtGBP(t.ni)]);
+    if (t.dividendTax > 0.5) taxRows.push([nm + " — dividend tax", fmtGBP(t.dividendTax)]);
+  }
+  if (r.hicbc > 0.5) taxRows.push(["Child benefit charge", fmtGBP(r.hicbc)]);
+  if (r.cgtPaid > 0.5) taxRows.push(["Capital gains tax", fmtGBP(r.cgtPaid)]);
+  if (r.withdrawalTax > 0.5) taxRows.push(["Tax on pension withdrawals", fmtGBP(r.withdrawalTax)]);
+  section("Tax", taxRows, "Total tax", fmtGBP(r.taxTotal));
+
+  section("Money out",
+    [...r.spendItems.map((x) => [x.name + (x.event ? " (what-if)" : ""), fmtGBP(x.amount)]),
+     ...(r.debtPay > 0.5 ? [["Debt payments (incl. " + fmtGBP(r.debtInterest) + " interest)", fmtGBP(r.debtPay)]] : []),
+     ...(r.pensionContribTotal > 0.5 ? [["Pension contributions (yours)", fmtGBP(r.pensionContribTotal)]] : []),
+     ...(r.plannedSavings > 0.5 ? [["Planned saving", fmtGBP(r.plannedSavings)]] : []),
+     ...(r.surplusSaved > 0.5 ? [["Surplus saved", fmtGBP(r.surplusSaved)]] : []),
+     ...(r.lumpOut > 0.5 ? [["One-off costs", fmtGBP(r.lumpOut)]] : [])],
+    "Total out (excl. tax)", fmtGBP(r.spendTotal + r.debtPay + r.pensionContribTotal + r.plannedSavings + r.surplusSaved + r.lumpOut));
+
+  if (r.shortfall > 0.5) {
+    const w = el("p", { style: "color:var(--critical);font-weight:600" }, "⚠ Shortfall this year: " + fmtGBP(r.shortfall) + " of spending could not be funded.");
+    dr.append(w);
+  }
+  if (r.employerContribTotal > 0.5) dr.append(el("p", { class: "cardnote" }, "Employer pension contributions added: " + fmtGBP(r.employerContribTotal) + " (not part of your cash flow)."));
+
+  section("Balances at year end",
+    [...assetSeries(state.proj).filter((s) => s.values[i] > 0.5).map((s) => [s.name, fmtGBP(s.values[i])]),
+     ...(r.liabTotal > 0.5 ? [["Debts", "−" + fmtGBP(r.liabTotal).replace("−", "")]] : [])],
+    "Net worth", fmtGBP(r.netWorth));
+
+  dr.classList.add("open");
+  renderCashflow();
+}
+document.addEventListener("keydown", (e) => { if (e.key === "Escape") { $("#year-drawer").classList.remove("open"); $("#modal-back").classList.remove("open"); } });
+
+/* ═══════════════════════════ what-if UI ═══════════════════════════ */
+function renderWhatIf() {
+  const d = state.data;
+  const list = $("#event-list"); list.textContent = "";
+  if (!d.events.length) list.append(el("p", { class: "cardnote" }, "No events yet — add one to explore “what if…?” with the client."));
+  for (const ev of d.events) {
+    const tmpl = EVENT_TEMPLATES[ev.template];
+    const card = el("div", { class: "event-card" + (ev.enabled ? "" : " disabled") });
+    const sw = el("label", { class: "switch" });
+    const cb = el("input", { type: "checkbox" });
+    cb.checked = !!ev.enabled;
+    cb.addEventListener("change", () => { ev.enabled = cb.checked; recompute(); });
+    sw.append(cb, el("span", { class: "track" }));
+    const main = el("div", { class: "ev-main" },
+      el("div", { class: "ev-name" }, ev.name),
+      el("div", { class: "ev-desc" }, tmpl ? tmpl.describe(ev.params, d) : ""));
+    const edit = el("button", { class: "btn small" }, "Edit");
+    edit.addEventListener("click", () => openEventForm(ev.template, ev));
+    const del = el("button", { class: "btn small danger" }, "Delete");
+    del.addEventListener("click", () => { d.events = d.events.filter((x) => x !== ev); recompute(); });
+    card.append(sw, main, edit, del);
+    list.append(card);
+  }
+
+  // impact tiles + comparison chart
+  const tiles = $("#wi-tiles"); tiles.textContent = "";
+  const base = state.base, proj = state.proj;
+  const anyOn = proj !== base;
+  const bEnd = base[base.length - 1].netWorth, pEnd = proj[proj.length - 1].netWorth;
+  const bRet = retirementRow(base).netWorth, pRet = retirementRow(proj).netWorth;
+  const dTile = (label, baseV, scenV) => {
+    const diff = scenV - baseV;
+    return tile(label, fmtCompact(scenV), anyOn ? { text: (diff >= 0 ? "+" : "") + fmtCompact(diff) + " vs baseline", dir: diff >= 0 ? "up" : "down" } : null);
+  };
+  tiles.append(dTile("Net worth at retirement", bRet, pRet), dTile("Net worth at end", bEnd, pEnd));
+  const bSf = firstShortfallYear(base), pSf = firstShortfallYear(proj);
+  tiles.append(tile("First shortfall", pSf ? pSf.label : "None", anyOn && String(bSf && bSf.label) !== String(pSf && pSf.label) ? { text: "baseline: " + (bSf ? bSf.label : "none"), dir: pSf && (!bSf || pSf.i < bSf.i) ? "down" : "up" } : null));
+
+  renderStackedChart($("#wi-chart"), {
+    mode: "area",
+    series: [],
+    labels: proj.map((r) => String(r.year)),
+    overlays: [
+      { name: "Scenario net worth", values: proj.map((r) => r.netWorth), className: "stroke-s1" },
+      { name: "Baseline net worth", values: base.map((r) => r.netWorth), dashed: true, legendColor: "var(--text-muted)" },
+    ],
+    height: 260,
+    tooltipTitle: (i) => proj[i].label,
+    onClickYear: (i) => openYearDrawer(i),
+  });
+}
+
+$("#btn-add-event").addEventListener("click", () => {
+  const m = $("#modal"); m.textContent = "";
+  m.append(el("h3", null, "Add a life event"));
+  const groups = {};
+  for (const [key, t] of Object.entries(EVENT_TEMPLATES)) (groups[t.group] = groups[t.group] || []).push([key, t]);
+  for (const [g, items] of Object.entries(groups)) {
+    m.append(el("h3", { style: "font-size:13px;color:var(--text-secondary);margin-top:14px" }, g));
+    const grid = el("div", { class: "tmpl-grid" });
+    for (const [key, t] of items) {
+      const b = el("button", { class: "tmpl-btn" }, el("div", { class: "t-name" }, t.name), el("div", { class: "t-desc" }, t.desc));
+      b.addEventListener("click", () => openEventForm(key, null));
+      grid.append(b);
+    }
+    m.append(grid);
+  }
+  const actions = el("div", { class: "actions", style: "margin-top:14px" });
+  const cancel = el("button", { class: "btn" }, "Cancel");
+  cancel.addEventListener("click", () => $("#modal-back").classList.remove("open"));
+  actions.append(cancel); m.append(actions);
+  $("#modal-back").classList.add("open");
+});
+$("#modal-back").addEventListener("click", (e) => { if (e.target === e.currentTarget) e.currentTarget.classList.remove("open"); });
+
+function openEventForm(templateKey, existing) {
+  const d = state.data;
+  const tmpl = EVENT_TEMPLATES[templateKey];
+  const m = $("#modal"); m.textContent = "";
+  m.append(el("h3", null, (existing ? "Edit: " : "") + tmpl.name), el("p", { class: "cardnote" }, tmpl.desc));
+  const form = el("div", { class: "formgrid" });
+  const inputs = {};
+  const params = existing ? existing.params : {};
+
+  const nameField = el("input", { type: "text", class: "wide", value: existing ? existing.name : tmpl.name });
+  const nf = el("div", { class: "field" }, el("label", null, "Event name"));
+  nf.append(nameField); form.append(nf);
+
+  for (const f of tmpl.fields) {
+    const field = el("div", { class: "field" }, el("label", null, f.label));
+    let inp;
+    const cur = params[f.key];
+    if (f.type === "person") {
+      inp = el("select");
+      d.people.forEach((p) => inp.append(el("option", { value: p.id }, p.name)));
+      if (cur) inp.value = cur;
+    } else if (f.type === "income") {
+      inp = el("select");
+      d.incomes.forEach((x) => inp.append(el("option", { value: x.id }, x.name)));
+      if (cur) inp.value = cur;
+    } else if (f.type && f.type.startsWith("asset")) {
+      const wantType = f.type.split(":")[1];
+      inp = el("select");
+      d.assets.filter((a) => !wantType || a.type === wantType).forEach((a) => inp.append(el("option", { value: a.id }, a.name)));
+      if (cur) inp.value = cur;
+    } else if (f.type === "select") {
+      inp = el("select");
+      f.options.forEach((o) => inp.append(el("option", { value: o }, o)));
+      inp.value = cur != null ? cur : f.def;
+    } else if (f.type === "year") {
+      inp = el("select");
+      state.base.forEach((r, i) => inp.append(el("option", { value: i }, r.label + " (" + agesLabel(r) + ")")));
+      inp.value = cur != null ? cur : Math.min(5, state.base.length - 1);
+    } else if (f.type === "text") {
+      inp = el("input", { type: "text", value: cur != null ? cur : (f.def || "") });
+    } else {
+      inp = el("input", { type: "number", step: f.type === "pct" ? "0.1" : "1", value: cur != null ? cur : f.def });
+    }
+    inputs[f.key] = { inp, f };
+    field.append(inp); form.append(field);
+  }
+  m.append(form);
+
+  const actions = el("div", { class: "actions" });
+  const cancel = el("button", { class: "btn" }, "Cancel");
+  cancel.addEventListener("click", () => $("#modal-back").classList.remove("open"));
+  const save = el("button", { class: "btn primary" }, existing ? "Save changes" : "Add event");
+  save.addEventListener("click", () => {
+    const p = {};
+    for (const [key, { inp, f }] of Object.entries(inputs)) {
+      if (f.type === "text" || f.type === "select" || f.type === "person" || f.type === "income" || (f.type || "").startsWith("asset")) p[key] = inp.value;
+      else p[key] = parseFloat(inp.value) || 0;
+    }
+    if (existing) { existing.params = p; existing.name = nameField.value || tmpl.name; existing.template = templateKey; }
+    else d.events.push({ id: "evt-" + Date.now().toString(36), name: nameField.value || tmpl.name, template: templateKey, enabled: true, params: p });
+    $("#modal-back").classList.remove("open");
+    recompute();
+    if (state.activeTab !== "whatif") $("#tabs [data-tab=whatif]").click();
+  });
+  actions.append(cancel, save); m.append(actions);
+  $("#modal-back").classList.add("open");
+}
+
+/* ═══════════════════════════ assumptions ═══════════════════════════ */
+function renderAssumptions() {
+  const d = state.data;
+  const g = $("#as-globals"); g.textContent = "";
+  const mk = (label, get, set) => {
+    const inp = el("input", { type: "number", step: "0.1", value: (get() * 100).toFixed(1) });
+    inp.addEventListener("change", () => { set((parseFloat(inp.value) || 0) / 100); recompute(); });
+    const f = el("div", { class: "field" }, el("label", null, label)); f.append(inp); g.append(f);
+  };
+  mk("Inflation (CPI) %/yr", () => d.assumptions.inflation, (v) => (d.assumptions.inflation = v));
+  mk("Wage growth %/yr", () => d.assumptions.wageGrowth, (v) => (d.assumptions.wageGrowth = v));
+  const buf = el("input", { type: "number", step: "500", value: d.assumptions.cashBufferTarget || 0 });
+  buf.addEventListener("change", () => { d.assumptions.cashBufferTarget = parseFloat(buf.value) || 0; recompute(); });
+  const bf = el("div", { class: "field" }, el("label", null, "Cash buffer target £")); bf.append(buf); g.append(bf);
+
+  $("#as-worder").textContent = (d.assumptions.withdrawalOrder || []).map((t) => ASSET_TYPE_LABEL[t] || t).join(" → ");
+  $("#as-sorder").textContent = (d.assumptions.surplusOrder || []).map((t) => ASSET_TYPE_LABEL[t] || t).join(" → ");
+
+  // per-year override grid
+  const wrap = $("#as-overrides"); wrap.textContent = "";
+  const tbl = el("table", { class: "data" });
+  const head = el("tr", null, el("th", null, "Year"), el("th", null, "Inflation %"), el("th", null, "Wage growth %"));
+  for (const a of d.assets) head.append(el("th", null, a.name + " %"));
+  tbl.append(el("thead", null, head));
+  const tb = el("tbody");
+  const yo = d.assumptions.yearOverrides;
+  state.base.forEach((r, i) => {
+    const tr = el("tr", null, el("td", null, r.label));
+    const cell = (get, set, placeholder) => {
+      const inp = el("input", { type: "number", step: "0.1", value: get() != null ? (get() * 100).toFixed(1) : "", placeholder });
+      inp.addEventListener("change", () => {
+        yo[String(i)] = yo[String(i)] || {};
+        set(inp.value === "" ? null : (parseFloat(inp.value) || 0) / 100);
+        recompute();
+      });
+      return el("td", null, inp);
+    };
+    tr.append(cell(() => (yo[String(i)] || {}).inflation, (v) => { if (v == null) delete yo[String(i)].inflation; else yo[String(i)].inflation = v; }, (d.assumptions.inflation * 100).toFixed(1)));
+    tr.append(cell(() => (yo[String(i)] || {}).wageGrowth, (v) => { if (v == null) delete yo[String(i)].wageGrowth; else yo[String(i)].wageGrowth = v; }, (d.assumptions.wageGrowth * 100).toFixed(1)));
+    for (const a of d.assets) {
+      tr.append(cell(
+        () => ((yo[String(i)] || {}).growth || {})[a.id],
+        (v) => {
+          yo[String(i)].growth = yo[String(i)].growth || {};
+          if (v == null) delete yo[String(i)].growth[a.id]; else yo[String(i)].growth[a.id] = v;
+        },
+        ((a.growthRate ?? 0.04) * 100).toFixed(1)));
+    }
+    tb.append(tr);
+  });
+  tbl.append(tb); wrap.append(tbl);
+}
+
+/* ═══════════════════════════ data view ═══════════════════════════ */
+function renderDataView() {
+  const d = state.data, v = $("#data-view"); v.textContent = "";
+  const section = (name, headers, rows2) => {
+    if (!rows2.length) return;
+    v.append(el("h3", { style: "margin-top:14px" }, name));
+    const t = el("table", { class: "data" });
+    t.append(el("thead", null, el("tr", null, ...headers.map((h) => el("th", null, h)))));
+    const tb = el("tbody");
+    for (const row of rows2) tb.append(el("tr", null, ...row.map((c) => el("td", null, c))));
+    t.append(tb); v.append(t);
+  };
+  section("People", ["Name", "Born", "Retires at", "State Pension age"],
+    d.people.map((p) => [p.name, p.dateOfBirth, String(p.retirementAge), String(p.statePensionAge || TAX.pensions.statePensionAgeDefault)]));
+  section("Children", ["Name", "Born"], (d.children || []).map((c) => [c.name, c.dateOfBirth]));
+  section("Income", ["Source", "Owner", "Type", "Gross /yr", "From age", "To age"],
+    d.incomes.map((x) => [x.name, personName(d, x.ownerId), x.type, fmtGBP(x.grossAnnual), x.startAge != null ? String(x.startAge) : "now", x.endAge != null ? String(x.endAge) : (x.type === "employment" || x.type === "selfEmployment" ? "retirement" : "plan end")]));
+  section("Spending", ["Item", "Category", "Per year", "Grows with"],
+    d.expenditure.map((x) => [x.name, x.category || "—", fmtGBP(x.annual), x.growthRate != null ? fmtPct(x.growthRate) : "inflation"]));
+  section("Assets", ["Asset", "Owner", "Type", "Value", "Growth", "Contribution"],
+    d.assets.map((a) => [a.name, a.ownerId === "joint" ? "Joint" : personName(d, a.ownerId), ASSET_TYPE_LABEL[a.type] || a.type, fmtGBP(a.value), fmtPct(a.growthRate ?? 0.04),
+      a.type === "pension" && a.linkedIncomeId ? fmtPct(a.memberContributionPct || 0) + " + " + fmtPct(a.employerContributionPct || 0) + " employer" : fmtGBP(a.annualContribution || 0) + "/yr"]));
+  section("Debts", ["Debt", "Balance", "Rate", "Payment /yr"],
+    (d.liabilities || []).map((l) => [l.name, fmtGBP(l.balance), fmtPct(l.interestRate || 0), fmtGBP(l.annualPayment || 0)]));
+}
+
+/* ═══════════════════════════ exports ═══════════════════════════ */
+function download(filename, blob) {
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = filename;
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+}
+const planSlug = () => (state.data.plan.title || "plan").toLowerCase().replace(/[^a-z0-9]+/g, "-").slice(0, 40);
+
+$("#btn-export-csv").addEventListener("click", () => {
+  const rows = state.proj;
+  const series = assetSeries(rows);
+  const head = ["Tax year", "Ages", "Gross income", "Child benefit", "Total tax", "Net income", "Spending", "Debt payments", "Pension contributions", "Planned+surplus saving", "Withdrawals", "Shortfall", ...series.map((s) => s.name), "Debts", "Net worth"];
+  const lines = [head.map(csvCell).join(",")];
+  rows.forEach((r, i) => {
+    lines.push([
+      r.label, agesLabel(r), r.grossIncome, r.childBenefit, r.taxTotal, r.netIncome, r.spendTotal, r.debtPay,
+      r.pensionContribTotal, r.plannedSavings + r.surplusSaved, sum(r.withdrawals.map((w) => w.amount)), r.shortfall,
+      ...series.map((s) => s.values[i]), r.liabTotal, r.netWorth,
+    ].map((v) => csvCell(typeof v === "number" ? Math.round(v) : v)).join(","));
+  });
+  download(planSlug() + "-projection.csv", new Blob([lines.join("\n")], { type: "text/csv" }));
+});
+const csvCell = (v) => { const s = String(v); return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; };
+
+$("#btn-export-json").addEventListener("click", () => {
+  download(planSlug() + "-client-data.json", new Blob([JSON.stringify(state.data, null, 2)], { type: "application/json" }));
+});
+$("#btn-load-json").addEventListener("click", () => $("#file-input").click());
+$("#file-input").addEventListener("change", (e) => {
+  const file = e.target.files[0];
+  if (!file) return;
+  file.text().then((txt) => {
+    try {
+      const d = JSON.parse(txt);
+      if (!d.people || !d.assets) throw new Error("not a client-data file");
+      d.events = d.events || [];
+      d.assumptions.yearOverrides = d.assumptions.yearOverrides || {};
+      state.data = d;
+      state.taxPerson = d.people[0].id;
+      state.selectedYear = null;
+      $("#hdr-title").textContent = d.plan.title || "Financial plan";
+      recompute();
+    } catch (err) { alert("Could not load file: " + err.message); }
+    e.target.value = "";
+  });
+});
+
+/* ═══════════════════════════ PDF report ═══════════════════════════ */
+$("#btn-report").addEventListener("click", buildAndPrintReport);
+function buildAndPrintReport() {
+  const rows = state.proj, base = state.base, d = state.data;
+  const rpt = $("#report"); rpt.textContent = "";
+  const page = (cls) => { const p = el("div", { class: "rpt-page " + (cls || "") }); rpt.append(p); return p; };
+
+  // cover
+  const cover = page("rpt-cover");
+  cover.append(
+    el("h1", null, d.plan.title || "Financial plan"),
+    el("p", { class: "sub" }, d.people.map((p) => p.name).join(" & ")),
+    el("p", { class: "sub" }, "Prepared " + new Date().toLocaleDateString("en-GB", { day: "numeric", month: "long", year: "numeric" }) + (d.plan.adviserName ? " by " + d.plan.adviserName : "")),
+    el("p", { class: "sub" }, "Illustrative lifetime cash-flow model · tax year __TAX_YEAR__ rules"));
+
+  // summary
+  const p1 = page();
+  p1.append(el("h2", null, "Your position at a glance"));
+  const retire = retirementRow(rows), end = rows[rows.length - 1], sf = firstShortfallYear(rows);
+  const t = el("table", { class: "data" }); const tb = el("tbody");
+  const row2 = (k, v) => tb.append(el("tr", null, el("td", null, k), el("td", null, v)));
+  row2("Net worth today", fmtGBP(rows[0].netWorth));
+  row2("Projected net worth at retirement (" + retire.label + ")", fmtGBP(retire.netWorth));
+  row2("Projected net worth at age " + d.plan.endAge, fmtGBP(end.netWorth));
+  row2("Total tax paid over the plan", fmtGBP(sum(rows.map((r) => r.taxTotal))));
+  row2("First year spending cannot be fully funded", sf ? sf.label + " (" + agesLabel(sf) + ")" : "None — the plan is fully funded");
+  t.append(tb); p1.append(t);
+
+  p1.append(el("h2", null, "Net worth over your lifetime"));
+  const nwBox = el("div", { class: "chartbox" }); p1.append(nwBox);
+  renderStackedChart(nwBox, {
+    mode: "area", series: assetSeries(rows), labels: rows.map((r) => String(r.year)),
+    overlays: [{ name: "Net worth (after debts)", values: rows.map((r) => r.netWorth) },
+      ...(rows !== base ? [{ name: "Baseline (no what-if events)", values: base.map((r) => r.netWorth), dashed: true, legendColor: "var(--text-muted)" }] : [])],
+    height: 300, interactive: false,
+  });
+
+  const p2 = page();
+  p2.append(el("h2", null, "Lifetime cash flow"));
+  const cfBox = el("div", { class: "chartbox" }); p2.append(cfBox);
+  renderStackedChart(cfBox, {
+    mode: "bar", series: cashflowSeries(rows), labels: rows.map((r) => String(r.year)),
+    overlays: [{ name: "Total outgoings", values: outflowValues(rows) }],
+    markers: rows.map((r, i) => (r.shortfall > 0.5 ? { idx: i } : null)).filter(Boolean),
+    height: 300, interactive: false,
+  });
+  p2.append(el("p", { class: "cardnote" }, "Bars show every source of money coming in each year; the line shows everything going out (spending, tax, debt payments and saving). Red markers flag years where spending could not be fully met from income and savings."));
+
+  if (d.events.length) {
+    p2.append(el("h2", null, "What-if events modelled"));
+    const te = el("table", { class: "data" });
+    te.append(el("thead", null, el("tr", null, el("th", null, "Event"), el("th", null, "Detail"), el("th", null, "Included?"))));
+    const tbe = el("tbody");
+    for (const ev of d.events) {
+      const tmpl = EVENT_TEMPLATES[ev.template];
+      tbe.append(el("tr", null, el("td", null, ev.name), el("td", null, tmpl ? tmpl.describe(ev.params, d) : ""), el("td", null, ev.enabled ? "Yes" : "No")));
+    }
+    te.append(tbe); p2.append(te);
+  }
+
+  // tax pages per person
+  for (const person of d.people) {
+    const pg = page();
+    pg.append(el("h2", null, "Personal tax — " + person.name));
+    const tt = el("table", { class: "data" });
+    tt.append(el("thead", null, el("tr", null, ...["Tax year", "Age", "Gross income", "Income tax", "NI", "Dividend tax", "CB charge", "Total tax", "Effective", "Take-home"].map((h) => el("th", null, h)))));
+    const ttb = el("tbody");
+    for (const r of rows) {
+      if (!r.alive[person.id]) continue;
+      const pp = r.perPerson[person.id], tx = pp.tax;
+      const hb = hicbcShare(r, person.id);
+      const tot = tx.incomeTax + tx.ni + tx.dividendTax + hb;
+      if (pp.gross < 1) continue;
+      ttb.append(el("tr", null,
+        el("td", null, r.label), el("td", null, String(r.ages[person.id])),
+        el("td", null, fmtGBP(pp.gross)), el("td", null, fmtGBP(tx.incomeTax)), el("td", null, fmtGBP(tx.ni)),
+        el("td", null, tx.dividendTax > 0.5 ? fmtGBP(tx.dividendTax) : "—"),
+        el("td", null, hb > 0.5 ? fmtGBP(hb) : "—"),
+        el("td", null, fmtGBP(tot)), el("td", null, pp.gross > 0 ? fmtPct(tot / pp.gross) : "—"),
+        el("td", null, fmtGBP(pp.gross - tot))));
+    }
+    tt.append(ttb); pg.append(tt);
+  }
+
+  // assumptions + disclaimer
+  const p4 = page();
+  p4.append(el("h2", null, "Assumptions"));
+  const ta = el("table", { class: "data" }); const tba = el("tbody");
+  const arow = (k, v) => tba.append(el("tr", null, el("td", null, k), el("td", null, v)));
+  arow("Inflation (CPI)", fmtPct(d.assumptions.inflation) + " per year");
+  arow("Wage growth", fmtPct(d.assumptions.wageGrowth) + " per year");
+  for (const a of d.assets) arow(a.name + " growth", fmtPct(a.growthRate ?? 0.04) + " per year");
+  arow("State Pension", fmtGBP(TAX.pensions.statePensionWeekly * 52) + "/yr today, triple-lock uprated");
+  arow("Withdrawal order when spending exceeds income", (d.assumptions.withdrawalOrder || []).map((x) => ASSET_TYPE_LABEL[x] || x).join(", then "));
+  arow("Tax rules", "Tax year __TAX_YEAR__, held constant (thresholds frozen as legislated)");
+  if (Object.keys(d.assumptions.yearOverrides).length) arow("Year-by-year overrides", "Applied in " + Object.keys(d.assumptions.yearOverrides).length + " year(s) — see the interactive plan");
+  ta.append(tba); p4.append(ta);
+
+  p4.append(el("h2", null, "Important information"));
+  p4.append(el("p", null, "This document is an illustrative lifetime cash-flow model, produced to help you understand your financial position. It is not financial advice, a personal recommendation, or a guarantee of future outcomes. Projections are entirely dependent on the assumptions shown above; actual investment returns, inflation, earnings and tax rules will differ from those assumed, and the differences compound over time."),
+    el("p", null, "Tax figures are calculated using the rules and rates for the " + "__TAX_YEAR__" + " tax year in England, Wales and Northern Ireland, applied to every projected year. Tax treatment depends on individual circumstances and may change. The value of investments can go down as well as up, and you may get back less than you invest."),
+    el("p", null, "Please check that the information in the Data section of the interactive plan is accurate and complete — the projection is only as good as the information it is based on."));
+
+  window.print();
+}
+
+/* ═══════════════════════════ boot ═══════════════════════════ */
+function renderAll() {
+  renderOverview();
+  renderTax();
+  renderNetWorth();
+  renderCashflow();
+  renderWhatIf();
+  renderAssumptions();
+  renderDataView();
+}
+$("#hdr-title").textContent = state.data.plan.title || "Financial plan";
+document.title = state.data.plan.title || "Financial plan";
+recompute();
+</script>
+</body>
+</html>

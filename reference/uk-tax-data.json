@@ -1,0 +1,71 @@
+{
+  "_comment": "Machine-readable UK tax rules consumed by the financial-plan engine. Figures are for the tax year below and must be kept in sync with reference/uk-tax-legislation.md (the sourced, human-readable version). Update both at the start of each tax year. All rates are decimals (0.20 = 20%). Region: England/Wales/NI (rUK). Scottish income tax is not modelled in v1.",
+  "taxYear": "2026/27",
+  "compiled": "2026-08-25",
+  "incomeTax": {
+    "personalAllowance": 12570,
+    "paTaperThreshold": 100000,
+    "paTaperRate": 0.5,
+    "bands": [
+      { "name": "Basic rate", "rate": 0.20, "upToTaxable": 37700 },
+      { "name": "Higher rate", "rate": 0.40, "upToTaxable": 125140 },
+      { "name": "Additional rate", "rate": 0.45, "upToTaxable": null }
+    ]
+  },
+  "nationalInsurance": {
+    "class1": {
+      "primaryThreshold": 12570,
+      "upperEarningsLimit": 50270,
+      "mainRate": 0.08,
+      "upperRate": 0.02
+    },
+    "class4": {
+      "lowerProfitsLimit": 12570,
+      "upperProfitsLimit": 50270,
+      "mainRate": 0.06,
+      "upperRate": 0.02
+    }
+  },
+  "dividends": {
+    "allowance": 500,
+    "rates": { "basic": 0.1075, "higher": 0.3575, "additional": 0.3935 }
+  },
+  "savings": {
+    "personalSavingsAllowance": { "basic": 1000, "higher": 500, "additional": 0 },
+    "startingRateBand": 5000
+  },
+  "capitalGains": {
+    "annualExemptAmount": 3000,
+    "rates": { "basic": 0.18, "higher": 0.24 }
+  },
+  "isa": {
+    "annualAllowance": 20000,
+    "lisaAllowance": 4000,
+    "jisaAllowance": 9000
+  },
+  "pensions": {
+    "annualAllowance": 60000,
+    "taperThresholdIncome": 200000,
+    "taperAdjustedIncome": 260000,
+    "taperedMinimum": 10000,
+    "mpaa": 10000,
+    "lumpSumAllowance": 268275,
+    "taxFreeProportion": 0.25,
+    "normalMinimumPensionAge": 57,
+    "statePensionWeekly": 241.30,
+    "statePensionAgeDefault": 67
+  },
+  "childBenefit": {
+    "firstChildWeekly": 27.05,
+    "otherChildWeekly": 17.90,
+    "hicbcThreshold": 60000,
+    "hicbcUpper": 80000
+  },
+  "inheritanceTax": {
+    "nilRateBand": 325000,
+    "residenceNilRateBand": 175000,
+    "rnrbTaperThreshold": 2000000,
+    "rate": 0.40,
+    "annualGiftExemption": 3000
+  }
+}

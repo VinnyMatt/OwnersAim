@@ -1,0 +1,186 @@
+{
+  "_instructions": "Template for a client data file. Copy to clients/<name>/client-data.json and fill in. Delete the partner block for a single client. Ages drive the timeline: the projection runs from the current tax year until the OLDEST person reaches plan.endAge. All amounts are annual and in £ unless stated. growthRate null means 'use the matching global assumption'. IDs must be unique strings.",
+
+  "plan": {
+    "title": "Financial plan for the Example family",
+    "adviserName": "",
+    "endAge": 95,
+    "startTaxYear": "2026/27"
+  },
+
+  "people": [
+    {
+      "id": "client",
+      "name": "First Last",
+      "dateOfBirth": "1981-05-14",
+      "retirementAge": 67,
+      "statePensionAge": 67,
+      "receivesStatePension": true,
+      "statePensionProportion": 1.0
+    },
+    {
+      "id": "partner",
+      "name": "Partner Name",
+      "dateOfBirth": "1983-02-02",
+      "retirementAge": 65,
+      "statePensionAge": 67,
+      "receivesStatePension": true,
+      "statePensionProportion": 1.0
+    }
+  ],
+
+  "children": [
+    { "name": "Child 1", "dateOfBirth": "2014-09-01" }
+  ],
+  "claimChildBenefit": true,
+
+  "incomes": [
+    {
+      "id": "salary-client",
+      "ownerId": "client",
+      "type": "employment",
+      "name": "Salary — Employer Ltd",
+      "grossAnnual": 65000,
+      "startAge": null,
+      "endAge": null,
+      "growthRate": null,
+      "_note": "endAge null on employment = stops at that person's retirementAge. growthRate null = wage growth assumption."
+    },
+    {
+      "id": "dividends-client",
+      "ownerId": "client",
+      "type": "dividend",
+      "name": "Dividends — own company",
+      "grossAnnual": 0,
+      "startAge": null,
+      "endAge": null,
+      "growthRate": null
+    },
+    {
+      "id": "db-pension-client",
+      "ownerId": "client",
+      "type": "dbPension",
+      "name": "Defined benefit pension",
+      "grossAnnual": 0,
+      "startAge": 67,
+      "endAge": null,
+      "growthRate": null,
+      "_note": "dbPension growthRate null = inflation-linked."
+    }
+  ],
+
+  "expenditure": [
+    {
+      "id": "essential",
+      "name": "Essential spending",
+      "category": "essential",
+      "annual": 30000,
+      "startAge": null,
+      "endAge": null,
+      "growthRate": null,
+      "_note": "Paste categorised totals from the bank-statement tool here as separate rows. growthRate null = inflation."
+    },
+    {
+      "id": "lifestyle",
+      "name": "Lifestyle spending",
+      "category": "lifestyle",
+      "annual": 12000,
+      "startAge": null,
+      "endAge": null,
+      "growthRate": null
+    }
+  ],
+
+  "assets": [
+    {
+      "id": "cash",
+      "ownerId": "client",
+      "type": "cash",
+      "name": "Cash savings",
+      "value": 20000,
+      "growthRate": 0.035,
+      "annualContribution": 0,
+      "contributionEndAge": null,
+      "_note": "cash growth is treated as taxable interest (PSA applied). ISA growth is tax-free. GIA growth is taxed via dividends/CGT approximation. Pension contributions get tax relief."
+    },
+    {
+      "id": "isa-client",
+      "ownerId": "client",
+      "type": "isa",
+      "name": "Stocks & shares ISA",
+      "value": 40000,
+      "growthRate": 0.05,
+      "annualContribution": 3600,
+      "contributionEndAge": null
+    },
+    {
+      "id": "gia-client",
+      "ownerId": "client",
+      "type": "gia",
+      "name": "General investment account",
+      "value": 0,
+      "growthRate": 0.05,
+      "annualContribution": 0,
+      "contributionEndAge": null
+    },
+    {
+      "id": "pension-client",
+      "ownerId": "client",
+      "type": "pension",
+      "name": "Workplace pension",
+      "value": 150000,
+      "growthRate": 0.05,
+      "linkedIncomeId": "salary-client",
+      "memberContributionPct": 0.05,
+      "employerContributionPct": 0.03,
+      "salarySacrifice": false,
+      "annualContribution": 0,
+      "contributionEndAge": null,
+      "_note": "Contributions = pct of linked salary while it pays, plus any fixed annualContribution."
+    },
+    {
+      "id": "home",
+      "ownerId": "joint",
+      "type": "property",
+      "name": "Family home",
+      "value": 450000,
+      "growthRate": 0.03,
+      "isMainResidence": true
+    }
+  ],
+
+  "liabilities": [
+    {
+      "id": "mortgage",
+      "name": "Mortgage — family home",
+      "type": "mortgage",
+      "balance": 220000,
+      "interestRate": 0.045,
+      "annualPayment": 18000,
+      "linkedAssetId": "home",
+      "_note": "Amortised annually: interest accrues, annualPayment reduces balance, payment appears in cash flow until repaid."
+    }
+  ],
+
+  "assumptions": {
+    "inflation": 0.025,
+    "wageGrowth": 0.035,
+    "surplusOrder": ["isa", "gia", "cash"],
+    "withdrawalOrder": ["cash", "gia", "isa", "pension"],
+    "cashBufferTarget": 10000,
+    "yearOverrides": {
+      "_note": "Optional per-year overrides, keyed by year index from plan start (\"0\", \"1\", ...). Each entry may set inflation, wageGrowth, or growth:{assetId:rate}. Also editable live in the plan UI.",
+      "_example": { "3": { "inflation": 0.03, "growth": { "isa-client": 0.02 } } }
+    }
+  },
+
+  "events": [
+    {
+      "_note": "Saved what-if events (same shape the plan UI creates). Usually leave empty; build scenarios live with the client.",
+      "_example": {
+        "id": "evt-1", "name": "Retire at 60", "template": "retireEarly",
+        "enabled": false, "params": { "personId": "client", "newRetirementAge": 60 }
+      }
+    }
+  ]
+}

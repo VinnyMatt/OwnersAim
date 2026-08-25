@@ -1,0 +1,61 @@
+{
+  "_instructions": "FICTIONAL demo household for testing and demonstrations. Not a real client.",
+
+  "plan": {
+    "title": "Financial plan — Alex & Sam Example",
+    "adviserName": "Demo Adviser",
+    "endAge": 95,
+    "startTaxYear": "2026/27"
+  },
+
+  "people": [
+    { "id": "alex", "name": "Alex Example", "dateOfBirth": "1981-05-14", "retirementAge": 67, "statePensionAge": 67, "receivesStatePension": true, "statePensionProportion": 1.0 },
+    { "id": "sam", "name": "Sam Example", "dateOfBirth": "1983-02-02", "retirementAge": 65, "statePensionAge": 67, "receivesStatePension": true, "statePensionProportion": 1.0 }
+  ],
+
+  "children": [
+    { "name": "Jamie", "dateOfBirth": "2014-09-01" },
+    { "name": "Rowan", "dateOfBirth": "2017-03-20" }
+  ],
+  "claimChildBenefit": true,
+
+  "incomes": [
+    { "id": "salary-alex", "ownerId": "alex", "type": "employment", "name": "Salary — Alex", "grossAnnual": 72000, "startAge": null, "endAge": null, "growthRate": null },
+    { "id": "salary-sam", "ownerId": "sam", "type": "employment", "name": "Salary — Sam", "grossAnnual": 38000, "startAge": null, "endAge": null, "growthRate": null },
+    { "id": "dividends-alex", "ownerId": "alex", "type": "dividend", "name": "Dividends — share portfolio", "grossAnnual": 1500, "startAge": null, "endAge": null, "growthRate": null }
+  ],
+
+  "expenditure": [
+    { "id": "essential", "name": "Essential spending", "category": "essential", "annual": 34000, "startAge": null, "endAge": null, "growthRate": null },
+    { "id": "lifestyle", "name": "Lifestyle spending", "category": "lifestyle", "annual": 14000, "startAge": null, "endAge": null, "growthRate": null },
+    { "id": "holidays", "name": "Holidays", "category": "lifestyle", "annual": 5000, "startAge": null, "endAge": 85, "growthRate": null }
+  ],
+
+  "assets": [
+    { "id": "cash", "ownerId": "joint", "type": "cash", "name": "Cash savings", "value": 25000, "growthRate": 0.035, "annualContribution": 0, "contributionEndAge": null },
+    { "id": "isa-alex", "ownerId": "alex", "type": "isa", "name": "S&S ISA — Alex", "value": 48000, "growthRate": 0.05, "annualContribution": 4800, "contributionEndAge": null },
+    { "id": "isa-sam", "ownerId": "sam", "type": "isa", "name": "S&S ISA — Sam", "value": 22000, "growthRate": 0.05, "annualContribution": 2400, "contributionEndAge": null },
+    { "id": "gia-alex", "ownerId": "alex", "type": "gia", "name": "Share portfolio (GIA)", "value": 30000, "growthRate": 0.05, "annualContribution": 0, "contributionEndAge": null },
+    { "id": "pension-alex", "ownerId": "alex", "type": "pension", "name": "Workplace pension — Alex", "value": 210000, "growthRate": 0.05, "linkedIncomeId": "salary-alex", "memberContributionPct": 0.06, "employerContributionPct": 0.06, "salarySacrifice": false, "annualContribution": 0, "contributionEndAge": null },
+    { "id": "pension-sam", "ownerId": "sam", "type": "pension", "name": "Workplace pension — Sam", "value": 85000, "growthRate": 0.05, "linkedIncomeId": "salary-sam", "memberContributionPct": 0.05, "employerContributionPct": 0.03, "salarySacrifice": false, "annualContribution": 0, "contributionEndAge": null },
+    { "id": "home", "ownerId": "joint", "type": "property", "name": "Family home", "value": 520000, "growthRate": 0.03, "isMainResidence": true }
+  ],
+
+  "liabilities": [
+    { "id": "mortgage", "name": "Mortgage — family home", "type": "mortgage", "balance": 240000, "interestRate": 0.042, "annualPayment": 21600, "linkedAssetId": "home" }
+  ],
+
+  "assumptions": {
+    "inflation": 0.025,
+    "wageGrowth": 0.035,
+    "surplusOrder": ["isa", "gia", "cash"],
+    "withdrawalOrder": ["cash", "gia", "isa", "pension"],
+    "cashBufferTarget": 15000,
+    "yearOverrides": {}
+  },
+
+  "events": [
+    { "id": "evt-demo-retire", "name": "Alex retires at 62", "template": "retireEarly", "enabled": false, "params": { "personId": "alex", "newRetirementAge": 62 } },
+    { "id": "evt-demo-fees", "name": "University costs × 2", "template": "schoolFees", "enabled": false, "params": { "name2": "University support", "year": 6, "years": 7, "annual": 9000 } }
+  ]
+}

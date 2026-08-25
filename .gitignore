@@ -1,0 +1,23 @@
+# ─────────────────────────────────────────────────────────────
+# PRIVACY: real client data must NEVER be committed to git.
+# Everything under clients/ stays local to the machine that
+# generated it. Only the fictional example data in examples/
+# is version-controlled.
+# ─────────────────────────────────────────────────────────────
+clients/*
+!clients/README.md
+
+# Generated output anywhere else
+*.plan.html
+
+# OS / editor noise
+.DS_Store
+Thumbs.db
+*.swp
+
+# Python
+__pycache__/
+*.pyc
+
+# Node
+node_modules/
