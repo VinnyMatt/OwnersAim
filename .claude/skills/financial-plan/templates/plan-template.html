@@ -653,18 +653,24 @@ function bizDividends(b, i) {
 /* Core income tax + NI for one person-year. All approximations documented in SKILL.md. */
 function taxCore(inp) {
   const IT = TAX.incomeTax, NI = TAX.nationalInsurance, DV = TAX.dividends, SV = TAX.savings;
-  const nonSavings = Math.max(0, inp.nonSavings);          // employment (after net-pay pension), SE, pensions, rental
+  const nonSavings = Math.max(0, inp.nonSavings);          // employment (after net-pay pension), SE, pensions
+  const property = Math.max(0, inp.property || 0);         // rental profit — dedicated rates from April 2027
   const savings = Math.max(0, inp.savings || 0);
   const dividends = Math.max(0, inp.dividends || 0);
-  const total = nonSavings + savings + dividends;
+  const total = nonSavings + property + savings + dividends;
+
+  // dedicated savings/property rates apply from the legislated tax year onwards
+  const SPR = TAX.savingsPropertyRates;
+  const useSPR = !!(inp.useDedicatedRates && SPR && SPR.rates);
 
   const ani = Math.max(0, total - (inp.reliefDeduction || 0)); // adjusted net income
   let pa = IT.personalAllowance;
   if (ani > IT.paTaperThreshold) pa = Math.max(0, pa - (ani - IT.paTaperThreshold) * IT.paTaperRate);
 
-  // allowance is set against non-savings first, then savings, then dividends
+  // allowance is set against non-savings first, then property, then savings, then dividends
   let paLeft = pa;
   const nsTaxable = Math.max(0, nonSavings - paLeft); paLeft = Math.max(0, paLeft - nonSavings);
+  const prTaxable = Math.max(0, property - paLeft);   paLeft = Math.max(0, paLeft - property);
   const svTaxable = Math.max(0, savings - paLeft);    paLeft = Math.max(0, paLeft - savings);
   const dvTaxable = Math.max(0, dividends - paLeft);
 
@@ -690,15 +696,18 @@ function taxCore(inp) {
   // non-savings
   incomeTax += fill(nsTaxable, (b) => bands[b].rate);
 
+  // property income (rental profit) — standard rates until the dedicated 22/42/47 rates start
+  incomeTax += fill(prTaxable, (b) => (useSPR ? SPR.rates[bandKey[b]] : bands[b].rate));
+
   // savings: starting rate band then PSA (both 0% but consume the band)
-  const startingRoom = Math.max(0, SV.startingRateBand - nsTaxable);
-  const totalTaxable = nsTaxable + svTaxable + dvTaxable;
+  const startingRoom = Math.max(0, SV.startingRateBand - nsTaxable - prTaxable);
+  const totalTaxable = nsTaxable + prTaxable + svTaxable + dvTaxable;
   const bandOfPerson = totalTaxable > bands[1].upToTaxable ? "additional" : totalTaxable > bands[0].upToTaxable ? "higher" : "basic";
   const psa = SV.personalSavingsAllowance[bandOfPerson];
   let svLeft = svTaxable;
   const zeroSv = Math.min(svLeft, startingRoom + psa);
   fill(zeroSv, () => 0); svLeft -= zeroSv;
-  incomeTax += fill(svLeft, (b) => bands[b].rate);
+  incomeTax += fill(svLeft, (b) => (useSPR ? SPR.rates[bandKey[b]] : bands[b].rate));
 
   // dividends: allowance at 0% (consumes band), rest at dividend band rates
   let dvLeft = dvTaxable;
@@ -1171,7 +1180,7 @@ function runProjection(d, events) {
     const perPerson = {};
     const incomeItems = []; // {name, ownerId, amount, kind, slot}
     for (const p of d.people) {
-      perPerson[p.id] = { nonSavings: 0, savings: 0, dividends: 0, employmentForNI: 0, seProfitsForNI: 0, reliefDeduction: 0, taxCredit: 0, gross: 0, items: [] };
+      perPerson[p.id] = { nonSavings: 0, property: 0, savings: 0, dividends: 0, employmentForNI: 0, seProfitsForNI: 0, reliefDeduction: 0, taxCredit: 0, gross: 0, items: [], useDedicatedRates: TAX.savingsPropertyRates && startYear + i >= TAX.savingsPropertyRates.fromYear };
     }
     const personAlive = (pid) => alive[pid];
 
@@ -1203,6 +1212,7 @@ function runProjection(d, events) {
       pp.gross += amount;
       pp.items.push({ name: inc.name, amount, type: inc.type });
       if (inc.type === "dividend") pp.dividends += amount;
+      else if (inc.type === "rental") pp.property += amount;
       else pp.nonSavings += amount;
       if (inc.type === "employment") pp.employmentForNI += amount;
       if (inc.type === "selfEmployment") pp.seProfitsForNI += amount;
@@ -1305,7 +1315,7 @@ function runProjection(d, events) {
         for (const [pid, share] of btlOwners(d, cfg, alive)) {
           const pp = perPerson[pid];
           pp.gross += opProfit * share;
-          pp.nonSavings += opProfit * share;   // Section 24: mortgage interest is NOT deducted…
+          pp.property += opProfit * share;     // Section 24: mortgage interest is NOT deducted…
           pp.taxCredit = (pp.taxCredit || 0) + TAX.incomeTax.bands[0].rate * Math.min(interest, Math.max(0, opProfit)) * share; // …instead a basic-rate credit applies
           pp.items.push({ name: label + " rent (net of costs)", amount: opProfit * share, type: "rental" });
         }
@@ -2885,6 +2895,7 @@ const SDLT_TYPES = {
   main: "Moving home / main residence",
   ftb: "First-time buyer",
   additional: "Additional property (second home / buy-to-let)",
+  company: "Limited company (residential let)",
   commercial: "Non-residential or mixed use",
 };
 
@@ -2899,6 +2910,13 @@ function sdltCalc(price, type, nonResident) {
     if (type === "ftb") note = "First-time buyer relief is not available above " + fmtGBP(SD.firstTimeBuyerMaxPrice) + " — standard rates apply.";
     bands = SD.residentialBands;
     if (type === "additional") surcharge += SD.additionalPropertySurcharge;
+    if (type === "company") {
+      surcharge += SD.additionalPropertySurcharge; // companies always pay the higher rates
+      note = "Companies always pay the additional-property surcharge. This assumes a qualifying property rental business" +
+        (price > SD.companyFlatRateThreshold
+          ? " — without that relief, purchases over " + fmtGBP(SD.companyFlatRateThreshold) + " pay a flat " + fmtPct(SD.companyFlatRate) + " (" + fmtGBP(price * SD.companyFlatRate) + " here) instead."
+          : ".");
+    }
   }
   if (nonResident && type !== "commercial") surcharge += SD.nonResidentSurcharge;
 

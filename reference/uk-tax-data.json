@@ -34,6 +34,11 @@
     "personalSavingsAllowance": { "basic": 1000, "higher": 500, "additional": 0 },
     "startingRateBand": 5000
   },
+  "savingsPropertyRates": {
+    "_note": "Autumn Budget 2025: from 6 April 2027 savings income and property income are taxed at dedicated rates 2pp above the standard bands. The engine applies these to rental profit and savings interest from the fromYear tax year onwards.",
+    "fromYear": 2027,
+    "rates": { "basic": 0.22, "higher": 0.42, "additional": 0.47 }
+  },
   "capitalGains": {
     "annualExemptAmount": 3000,
     "rates": { "basic": 0.18, "higher": 0.24 },
@@ -77,7 +82,10 @@
     "firstTimeBuyerMaxPrice": 500000,
     "additionalPropertySurcharge": 0.05,
     "nonResidentSurcharge": 0.02,
-    "nonResidentialBands": [[150000, 0], [250000, 0.02], [null, 0.05]]
+    "nonResidentialBands": [[150000, 0], [250000, 0.02], [null, 0.05]],
+    "companyFlatRate": 0.17,
+    "companyFlatRateThreshold": 500000,
+    "_company_note": "Companies buying residential always pay the additional-property surcharge on the banded rates. Over £500,000 a flat 17% applies instead UNLESS the company qualifies for relief (e.g. a genuine property rental business) — the calculator assumes a qualifying rental business and shows the 17% caveat. Figure per post-Oct-2024 rules; re-verify at the next tax-year update."
   },
   "inheritanceTax": {
     "nilRateBand": 325000,

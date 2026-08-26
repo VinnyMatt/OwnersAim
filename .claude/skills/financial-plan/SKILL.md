@@ -106,10 +106,13 @@ the PDF report. Rebuild only when the underlying facts or tax rules change.
 - The Inheritance tax tab shows year-by-year exposure (spouse exemption + transferable
   NRB/RNRB with taper, pensions in the estate from April 2027); it does NOT deduct IHT
   inside the projection on a death what-if, and gifts/trusts/BPR are not modelled.
+- From April 2027 the engine taxes rental profit and savings interest at the dedicated
+  22/42/47% rates (reference/uk-tax-data.json → savingsPropertyRates); the Section 24
+  credit stays at the 20% basic rate (whether it rises to 22% is not yet legislated —
+  update when confirmed).
 - Scottish income tax bands, student loans and annual-allowance charges are NOT modelled
   in v1 — say so if relevant, and consult `reference/uk-tax-legislation.md` for manual
-  guidance. From April 2027 savings/property income get dedicated rates — flag this for
-  long plans until the engine is updated.
+  guidance.
 
 ## Keeping tax rules current
 
