@@ -213,6 +213,21 @@ svg .col.hot { opacity: 1; }
 .viz-tooltip .tt-total { border-top: 1px solid var(--grid); margin-top: 4px; padding-top: 4px; }
 .viz-tooltip .tt-total .nm { color: var(--text-primary); font-weight: 600; }
 
+/* About you: seamless click-to-edit fields — read like plain table text until touched */
+#data-view input, #data-view select {
+  background: transparent; border: 1px solid transparent; border-radius: 6px;
+  padding: 2px 6px; font-size: 13px; color: var(--text-primary);
+  font-variant-numeric: tabular-nums; transition: border-color .12s, background .12s;
+}
+#data-view select { appearance: none; -webkit-appearance: none; cursor: pointer; }
+#data-view input[type=number] { text-align: right; }
+#data-view tr:hover input, #data-view tr:hover select { border-color: var(--border); }
+#data-view input:focus, #data-view select:focus { border-color: var(--accent); background: var(--raised); outline: none; }
+#data-view input::placeholder { color: var(--text-muted); }
+#data-view input[type=date]::-webkit-calendar-picker-indicator { opacity: .3; }
+#data-view .btn.danger { border-color: transparent; opacity: 0; transition: opacity .12s; }
+#data-view tr:hover .btn.danger { opacity: 1; }
+
 /* what-if */
 .event-list { display: flex; flex-direction: column; gap: 10px; }
 .event-card {
