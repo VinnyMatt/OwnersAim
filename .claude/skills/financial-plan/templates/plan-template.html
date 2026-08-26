@@ -76,7 +76,6 @@ a { color: var(--accent); }
     linear-gradient(var(--accent), var(--accent)) 50% 28%/1.6px 5px no-repeat,
     linear-gradient(var(--accent), var(--accent)) 62% 52%/5px 1.6px no-repeat;
 }
-.app-header .sub { color: var(--text-muted); font-family: var(--font-mono); font-size: 11px; letter-spacing: .02em; }
 .toolbar { display: flex; gap: 8px; flex-wrap: wrap; }
 .btn {
   font-family: var(--font-body); font-weight: 700; font-size: 13px;
@@ -97,7 +96,7 @@ a { color: var(--accent); }
 .tabs {
   display: flex; gap: 2px; padding: 0 18px; background: rgba(12,11,18,.78);
   backdrop-filter: blur(14px);
-  border-bottom: 1px solid var(--border-soft); position: sticky; top: 63px; z-index: 39;
+  border-bottom: 1px solid var(--border-soft); position: sticky; top: 57px; z-index: 39;
   overflow-x: auto;
 }
 .tabs button {
@@ -313,7 +312,6 @@ footer.privacy {
 <header class="app-header">
   <div class="titleblock">
     <h1 id="hdr-title">Financial plan</h1>
-    <div class="sub" id="hdr-sub">Prepared __BUILD_DATE__ · Tax year __TAX_YEAR__ · Private &amp; confidential</div>
   </div>
   <div class="toolbar">
     <button class="btn" id="btn-load-json" title="Load an updated client-data.json">Load data…</button>
@@ -512,20 +510,11 @@ footer.privacy {
 
   <section class="tabpane active" id="pane-data">
     <div class="card">
-      <h2>Plan inputs</h2>
-      <p class="cardnote">Everything the projection is built from — please check it is accurate and complete, as the plan is only as good as this information. Permanent corrections are made with your adviser; possible changes are best explored as scenarios on the What-if tab.</p>
+      <h2>About you</h2>
       <div id="data-view"></div>
     </div>
   </section>
 </main>
-
-<footer class="privacy">
-  <strong>Privacy:</strong> this file is self-contained: your financial information never leaves it, nothing is
-  stored outside it, and all calculations run locally in your browser. The only network request is loading the
-  display fonts (no information is sent, and the plan works fully offline with system fonts). Please treat the
-  file itself as confidential — it contains your financial information. <strong>Important:</strong> this is an illustrative cash-flow model, not financial advice;
-  projections depend on the assumptions shown, are not guaranteed, and tax rules may change.
-</footer>
 
 <div class="viz-tooltip" id="tooltip"></div>
 
@@ -2963,7 +2952,7 @@ function renderBusinesses() {
     box.append(el("p", { class: "cardnote", style: "margin:10px 0 0" },
       `Today: turnover ${fmtCompact(m0.turnover)}, net profit ${fmtCompact(m0.profit)}, your share valued at ${fmtCompact(m0.valuation)}` +
       (b.dividendsDrawn > 0 ? `, drawing ${fmtCompact(b.dividendsDrawn)} in dividends (${bizSplitLabel(d, b)})` : "") +
-      `. Growth and profit margin can both be varied year by year in the “${b.name}” columns on the Assumptions tab.`));
+      `. Growth and profit margin can be adjusted for any individual year in the table below — the chart and every other tab update as you type.`));
     editors.append(box);
   }
 
@@ -2993,7 +2982,7 @@ function renderBusinesses() {
     const wrap = el("div", { class: "tablewrap" });
     const tbl = el("table", { class: "data" });
     tbl.append(el("thead", null, el("tr", null,
-      ...["Year", "Ages", "Turnover", "Net profit", "Valuation (your share)", "Drawn as salary", "Drawn as dividends"].map((h) => el("th", null, h)))));
+      ...["Year", "Ages", "Growth %", "Margin %", "Turnover", "Net profit", "Valuation (your share)", "Drawn as salary", "Drawn as dividends"].map((h) => el("th", null, h)))));
     const tb = el("tbody");
     const linkedAmount = (r, incId) => {
       if (!incId) return null;
@@ -3009,15 +2998,35 @@ function renderBusinesses() {
       const sal = linkedAmount(r, b.salaryIncomeId);
       const direct = r.incomeItems.find((x) => x.name === b.name + " — dividends");
       const div2 = (linkedAmount(r, b.dividendIncomeId) || 0) + (direct ? direct.amount : 0);
+      const yo = state.data.assumptions.yearOverrides;
+      const ovrCell = (kind, defaultPct) => {
+        const cur = ((yo[String(i)] || {})[kind] || {})[b.id];
+        const inp = el("input", { type: "number", step: "0.5", value: cur != null ? (cur * 100).toFixed(1) : "", placeholder: defaultPct });
+        inp.addEventListener("change", () => {
+          yo[String(i)] = yo[String(i)] || {};
+          yo[String(i)][kind] = yo[String(i)][kind] || {};
+          if (inp.value === "") delete yo[String(i)][kind][b.id];
+          else yo[String(i)][kind][b.id] = (parseFloat(inp.value) || 0) / 100;
+          recompute();
+        });
+        return el("td", null, inp);
+      };
       const tr = el("tr", null,
         el("td", null, r.label),
-        el("td", null, agesLabel(r)),
+        el("td", null, agesLabel(r)));
+      if (m2.sold || m2.soldThisYear) {
+        tr.append(el("td", null, "—"), el("td", null, "—"));
+      } else {
+        tr.append(ovrCell("bizGrowth", (bizDefaultGrowth(b) * 100).toFixed(1)));
+        tr.append(ovrCell("bizMargin", ((b.profitMargin != null ? b.profitMargin : 0.15) * 100).toFixed(1)));
+      }
+      tr.append(
         el("td", null, m2.soldThisYear || m2.sold ? "—" : fmtGBP(m2.turnover || 0)),
         el("td", null, m2.soldThisYear || m2.sold ? "—" : fmtGBP(m2.profit || 0)),
         el("td", null, m2.soldThisYear ? "sold for " + fmtGBP(m2.proceeds) + " (CGT " + fmtGBP(m2.cgt) + ")" : m2.sold ? "sold" : fmtGBP(m2.valuation || 0)),
         el("td", null, sal != null && sal > 0.5 ? fmtGBP(sal) : "—"),
         el("td", null, div2 > 0.5 ? fmtGBP(div2) : "—"));
-      tr.addEventListener("click", () => openYearDrawer(i));
+      tr.addEventListener("click", (e) => { if (e.target.tagName !== "INPUT") openYearDrawer(i); });
       tb.append(tr);
     });
     tbl.append(tb); wrap.append(tbl); card.append(wrap);
@@ -3476,14 +3485,14 @@ function renderDataView() {
   const d = state.data, v = $("#data-view"); v.textContent = "";
   const section = (name, headers, rows2) => {
     if (!rows2.length) return;
-    v.append(el("h3", { style: "margin-top:14px" }, name));
+    if (name) v.append(el("h3", { style: "margin-top:14px" }, name));
     const t = el("table", { class: "data" });
     t.append(el("thead", null, el("tr", null, ...headers.map((h) => el("th", null, h)))));
     const tb = el("tbody");
     for (const row of rows2) tb.append(el("tr", null, ...row.map((c) => el("td", null, c))));
     t.append(tb); v.append(t);
   };
-  section("People", ["Name", "Born", "Retires at", "State Pension age"],
+  section("", ["Name", "Born", "Retires at", "State Pension age"],
     d.people.map((p) => [p.name, p.dateOfBirth, String(p.retirementAge), String(p.statePensionAge || TAX.pensions.statePensionAgeDefault)]));
   section("Children", ["Name", "Born"], (d.children || []).map((c) => [c.name, c.dateOfBirth]));
   section("Income", ["Source", "Owner", "Type", "Gross /yr", "From age", "To age"],
@@ -3676,9 +3685,6 @@ function renderAll() {
 }
 $("#hdr-title").textContent = state.data.plan.title || "Financial plan";
 document.title = state.data.plan.title || "Financial plan";
-if (state.data.plan.adviserName) {
-  $("#hdr-sub").textContent = "Prepared by " + state.data.plan.adviserName + " · " + $("#hdr-sub").textContent.replace("Prepared ", "");
-}
 recompute();
 </script>
 </body>
