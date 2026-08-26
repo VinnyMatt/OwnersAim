@@ -213,6 +213,14 @@ svg .col.hot { opacity: 1; }
 .viz-tooltip .tt-total { border-top: 1px solid var(--grid); margin-top: 4px; padding-top: 4px; }
 .viz-tooltip .tt-total .nm { color: var(--text-primary); font-weight: 600; }
 
+/* pension-limit warnings */
+.warnbox {
+  border: 1px solid; border-radius: 12px; padding: 10px 14px;
+  font-size: 13px; line-height: 1.5;
+}
+.warnbox.red { color: #FFB4B5; border-color: rgba(255,77,79,.45); background: rgba(255,77,79,.08); }
+.warnbox.amber { color: #F4CE8C; border-color: rgba(232,162,63,.45); background: rgba(232,162,63,.08); }
+
 /* About you: seamless click-to-edit fields — read like plain table text until touched */
 #data-view input, #data-view select {
   background: transparent; border: 1px solid transparent; border-radius: 6px;
@@ -405,6 +413,7 @@ footer.privacy {
 
   <section class="tabpane" id="pane-pensions">
     <div class="tiles" id="pn-tiles"></div>
+    <div id="pn-warnings" style="display:flex;flex-direction:column;gap:8px;margin-bottom:14px"></div>
     <div id="pn-cards"></div>
     <div class="card" id="pn-state"></div>
     <div class="card" id="pn-education"></div>
@@ -492,6 +501,7 @@ footer.privacy {
       <p class="cardnote" id="as-surplus-note"></p>
       <div class="tablewrap" id="as-surplus-plan"></div>
       <div class="controls" id="as-surplus-actions" style="margin-top:10px;margin-bottom:0"></div>
+      <div id="as-surplus-warnings" style="display:flex;flex-direction:column;gap:8px;margin-top:12px"></div>
     </div>
     <div class="card">
       <h3>Growth assumptions by asset</h3>
@@ -1115,6 +1125,7 @@ function runProjection(d, events) {
   const liabs = (d.liabilities || []).map((l) => ({ ...l, bal: l.balance }));
   const alive = {}; d.people.forEach((p) => (alive[p.id] = true));
   const btlState = {}; // buy-to-let lifecycle per event id
+  const accessedPension = {}; // person id → true once taxable pension withdrawals begin (MPAA trigger)
   const retAge = (p) => mods.retirementAge[p.id] != null ? mods.retirementAge[p.id] : p.retirementAge;
   const spTL = (i) => Math.max(0.025, inflationFor(i), wageGrowthFor(i)); // triple-lock proxy
 
@@ -1399,6 +1410,7 @@ function runProjection(d, events) {
     // ── pension contributions ──
     let pensionContribTotal = 0, employerContribTotal = 0;
     const contribByAsset = {};
+    const pensionByPerson = {}; // pid → {member, employer} gross, for annual-allowance checks
     for (const a of assets) {
       if (a.type !== "pension") continue;
       let member = 0, employer = 0;
@@ -1417,6 +1429,10 @@ function runProjection(d, events) {
       if (member || employer) {
         contribByAsset[a.id] = (contribByAsset[a.id] || 0) + member + employer;
         pensionContribTotal += member; employerContribTotal += employer;
+        const pid = a.ownerId === "joint" ? d.people[0].id : a.ownerId;
+        pensionByPerson[pid] = pensionByPerson[pid] || { member: 0, employer: 0 };
+        pensionByPerson[pid].member += member;
+        pensionByPerson[pid].employer += employer;
         const pp = perPerson[a.ownerId];
         if (pp) {
           if (a.salarySacrifice && linkedAmt > 0) {
@@ -1587,6 +1603,7 @@ function runProjection(d, events) {
               pp.tax = taxCore(pp);
               withdrawalTax += tax2; taxTotal += tax2;
               a.bal -= gross; need -= gross - tax2;
+              if (owner) accessedPension[owner.id] = true; // flexible access triggers the MPAA
               takeFrom(a.id, gross);
               withdrawals.push({ name: a.name, amount: gross, type: typ });
             } else {
@@ -1642,6 +1659,18 @@ function runProjection(d, events) {
           if (a) {
             if (a.type === "isa") { amt = Math.min(amt, isaRoom); isaRoom -= amt; }
             if (amt <= 0.5) continue;
+            if (a.type === "pension") {
+              // relief at source: the provider adds basic-rate relief on top of the net payment
+              const pid = a.ownerId === "joint" ? d.people[0].id : a.ownerId;
+              if (!alive[pid]) continue;
+              const gross = amt / (1 - TAX.incomeTax.bands[0].rate);
+              a.bal += gross;
+              surplus -= amt;
+              surplusUses.push({ name: a.name + " (" + fmtGBP(gross) + " incl. tax relief)", amount: amt });
+              pensionByPerson[pid] = pensionByPerson[pid] || { member: 0, employer: 0 };
+              pensionByPerson[pid].member += gross;
+              continue;
+            }
             a.bal += amt; if (a.type === "gia") a.basis += amt;
             surplus -= amt;
             surplusUses.push({ name: a.name, amount: amt });
@@ -1685,6 +1714,39 @@ function runProjection(d, events) {
       flow = surplus;
     }
 
+    // ── pension contribution limit checks (annual allowance, taper, MPAA, earnings cap) ──
+    const pensionWarnings = [];
+    for (const p of d.people) {
+      if (!alive[p.id]) continue;
+      const pc = pensionByPerson[p.id];
+      if (!pc || pc.member + pc.employer <= 0.5) continue;
+      const PEN = TAX.pensions, pp = perPerson[p.id];
+      const total = pc.member + pc.employer;
+      const earnings = Math.max(0, pp.employmentForNI + pp.seProfitsForNI); // gross earned income (already pre-deduction)
+      const thresholdIncome = pp.gross;                       // approximation: income excl. employer contributions
+      const adjustedIncome = pp.gross + pc.member + pc.employer;
+      let aa = PEN.annualAllowance, tapered = false;
+      if (thresholdIncome > PEN.taperThresholdIncome && adjustedIncome > PEN.taperAdjustedIncome) {
+        aa = Math.max(PEN.taperedMinimum, PEN.annualAllowance - (adjustedIncome - PEN.taperAdjustedIncome) / 2);
+        tapered = true;
+      }
+      const nm = p.name.split(" ")[0];
+      if (accessedPension[p.id] && total > PEN.mpaa) {
+        pensionWarnings.push({ pid: p.id, sev: "red", type: "mpaa",
+          text: nm + ": pension already flexibly accessed, so the £" + PEN.mpaa.toLocaleString() + " Money Purchase Annual Allowance applies — contributions of " + fmtGBP(total) + " exceed it and the excess would face a tax charge." });
+      } else if (total > aa + 0.5) {
+        pensionWarnings.push({ pid: p.id, sev: "red", type: tapered ? "taper" : "aa",
+          text: nm + ": pension contributions of " + fmtGBP(total) + " exceed the " + (tapered ? "tapered annual allowance of " + fmtGBP(aa) + " (high income reduces it)" : "£" + PEN.annualAllowance.toLocaleString() + " annual allowance") + " — the excess would face a tax charge unless unused allowance can be carried forward from the previous three years (not modelled)." });
+      } else if (total > aa * 0.8) {
+        pensionWarnings.push({ pid: p.id, sev: "amber", type: "close",
+          text: nm + ": pension contributions of " + fmtGBP(total) + " are within 20% of the " + (tapered ? "tapered " : "") + "annual allowance (" + fmtGBP(aa) + ")." });
+      }
+      if (pc.member > Math.max(earnings, PEN.reliefEarningsFloor) + 0.5) {
+        pensionWarnings.push({ pid: p.id, sev: "red", type: "earnings",
+          text: nm + ": personal contributions of " + fmtGBP(pc.member) + " exceed relevant earnings (" + fmtGBP(earnings) + ") — tax relief is only available up to earnings (or £3,600 if higher)." });
+      }
+    }
+
     // ── record row ──
     const assetBals = {}; let assetTotal = 0;
     for (const a of assets) { assetBals[a.id] = (assetBals[a.id] || 0) + Math.max(0, a.bal); assetTotal += Math.max(0, a.bal); }
@@ -1703,7 +1765,7 @@ function runProjection(d, events) {
       spendTotal, spendItems, debtPay, debtInterest,
       pensionContribTotal, employerContribTotal, plannedSavings,
       incomeItems, withdrawals, lumpIn, lumpOut, lumpNames: [...cbLumpNames],
-      shortfall, surplusSaved: surplusTotal, surplusUses,
+      shortfall, surplusSaved: surplusTotal, surplusUses, pensionWarnings,
       assets: assetBals, assetOut, assetTotal, liabs: liabBals, liabTotal, offsets: liabOffset, netWorth: assetTotal - liabTotal,
       inflFactor: infl,
     });
@@ -2805,6 +2867,7 @@ function renderPensions() {
     tile("Projected at retirement", fmtCompact(atRet)),
     tile("Fees this year", feeNow > 0.5 ? fmtGBP(feeNow) : "not captured"),
   );
+  renderPensionWarnings($("#pn-warnings"));
 
   const cards = $("#pn-cards"); cards.textContent = "";
   for (const a of pensions) {
@@ -3547,6 +3610,7 @@ function renderSurplusPlan() {
   const targetOptions = () => {
     const opts = [];
     for (const a of d.assets.filter((x) => ["cash", "isa", "gia"].includes(x.type))) opts.push([a.id, a.name]);
+    for (const a of d.assets.filter((x) => x.type === "pension")) opts.push([a.id, "Pension — " + a.name + " (relief added)"]);
     for (const l of d.liabilities || []) opts.push([l.id, "Pay down — " + l.name]);
     return opts;
   };
@@ -3568,7 +3632,7 @@ function renderSurplusPlan() {
     (totalPct < 100 ? `The unallocated ${Math.round(100 - totalPct)}% goes to cash.` :
      totalPct > 100 ? "Percentages above 100% are scaled down proportionally." :
      "Fully allocated.") +
-    " ISA destinations still respect the annual allowance; pensions are excluded here because personal contributions carry tax relief — model those with the pension's own contribution settings.";
+    " ISA destinations respect the annual ISA allowance. Pension destinations are treated as personal contributions with basic-rate tax relief added on top (higher-rate relief reclaimed through a tax return is not modelled), and contribution limits are monitored — warnings appear below if the annual allowance, taper or MPAA would be breached.";
 
   const tbl = el("table", { class: "data" });
   tbl.append(el("thead", null, el("tr", null, ...["Destination", "% of surplus", ""].map((h) => el("th", null, h)))));
@@ -3607,8 +3671,45 @@ function renderSurplusPlan() {
   actions.append(addRule,
     mkNew("cash account", "cash", "New cash savings", 0.04),
     mkNew("stocks & shares ISA", "isa", "New S&S ISA", 0.05),
-    mkNew("investment account", "gia", "New investment account (GIA)", 0.05),
-    back);
+    mkNew("investment account", "gia", "New investment account (GIA)", 0.05));
+  for (const p of d.people) {
+    const b = el("button", { class: "btn small" }, "+ New pension — " + p.name.split(" ")[0]);
+    b.addEventListener("click", () => {
+      const id = "pension-new-" + p.id + "-" + Date.now().toString(36);
+      d.assets.push({ id, ownerId: p.id, type: "pension", name: "New SIPP — " + p.name.split(" ")[0], value: 0, growthRate: 0.05, annualContribution: 0, contributionEndAge: null });
+      plan.push({ target: id, pct: 0 });
+      recompute();
+    });
+    actions.append(b);
+  }
+  actions.append(back);
+
+  renderPensionWarnings($("#as-surplus-warnings"));
+}
+
+/* aggregate the projection's pension-limit warnings: one line per person+type, first year it occurs */
+function pensionWarningSummary() {
+  const seen = new Map();
+  for (const r of state.proj) {
+    for (const w of r.pensionWarnings || []) {
+      const key = w.pid + ":" + w.type;
+      if (!seen.has(key)) seen.set(key, { ...w, firstYear: r.label, count: 1 });
+      else seen.get(key).count++;
+    }
+  }
+  return Array.from(seen.values());
+}
+
+function renderPensionWarnings(container) {
+  if (!container) return;
+  container.textContent = "";
+  const warnings = pensionWarningSummary();
+  if (!warnings.length) return;
+  for (const w of warnings.sort((a, b) => (a.sev === "red" ? -1 : 1) - (b.sev === "red" ? -1 : 1))) {
+    container.append(el("div", { class: "warnbox " + (w.sev === "red" ? "red" : "amber") },
+      (w.sev === "red" ? "⚠ " : "· ") + w.text +
+      " First occurs " + w.firstYear + (w.count > 1 ? ", and in " + (w.count - 1) + " further year" + (w.count > 2 ? "s" : "") + "." : ".")));
+  }
 }
 
 /* ═══════════════════════════ data view ═══════════════════════════ */

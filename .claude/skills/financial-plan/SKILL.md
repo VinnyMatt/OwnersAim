@@ -96,7 +96,14 @@ the PDF report. Rebuild only when the underlying facts or tax rules change.
   18%/24%; pension withdrawals are 25% tax-free with the rest taxed as income at the
   owner's computed marginal position (drawdown, no annuity modelling).
 - Shortfalls are funded in the assumptions' withdrawal order; surpluses top up the cash
-  buffer then fill ISA (respecting the annual allowance) then GIA.
+  buffer then fill ISA (respecting the annual allowance) then GIA — or follow the user's
+  percentage surplus plan (Assumptions tab), whose destinations can include pensions
+  (treated as relief-at-source: basic-rate relief added on top; higher-rate relief via
+  tax return NOT modelled) and debt paydown.
+- Pension contribution limits are monitored and warned on, not charged: annual allowance
+  £60k, tapered AA (approximated with threshold income ≈ gross income and adjusted
+  income ≈ gross + all contributions), MPAA once drawdown starts, and the
+  relevant-earnings relief cap. Carry forward is not modelled — the warnings say so.
 - HICBC is charged on the higher earner while any child is under 18.
 - Buy-to-let what-ifs: rent grows with inflation; personal ownership taxes rental profit
   as non-savings income with the Section 24 basic-rate credit on mortgage interest (no

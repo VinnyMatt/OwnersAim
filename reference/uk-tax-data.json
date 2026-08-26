@@ -56,6 +56,7 @@
     "taperAdjustedIncome": 260000,
     "taperedMinimum": 10000,
     "mpaa": 10000,
+    "reliefEarningsFloor": 3600,
     "lumpSumAllowance": 268275,
     "taxFreeProportion": 0.25,
     "normalMinimumPensionAge": 57,
