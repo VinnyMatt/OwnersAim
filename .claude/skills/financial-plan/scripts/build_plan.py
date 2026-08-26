@@ -77,7 +77,7 @@ def main():
         template
         .replace("/*__CLIENT_DATA__*/{}", json.dumps(client, indent=1))
         .replace("/*__TAX_DATA__*/{}", json.dumps(tax, indent=1))
-        .replace("__BUILD_DATE__", date.today().isoformat())
+        .replace("__BUILD_DATE__", date.today().strftime("%d %B %Y").lstrip("0"))
         .replace("__TAX_YEAR__", tax.get("taxYear", "?"))
     )
     for marker in ("/*__CLIENT_DATA__*/", "/*__TAX_DATA__*/"):

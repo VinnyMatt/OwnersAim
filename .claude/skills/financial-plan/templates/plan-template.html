@@ -165,6 +165,7 @@ table.data th {
   position: sticky; top: 0; background: var(--raised);
 }
 table.data td:first-child, table.data th:first-child { text-align: left; }
+table.data tbody tr:nth-child(even) td { background: rgba(247,245,238,.025); }
 table.data tr:hover td { background: var(--accent-soft); }
 table.data tr.selected td { background: var(--accent-soft); }
 table.data tr.shortfall td { color: var(--critical); }
@@ -312,7 +313,7 @@ footer.privacy {
 <header class="app-header">
   <div class="titleblock">
     <h1 id="hdr-title">Financial plan</h1>
-    <div class="sub">Tax year __TAX_YEAR__ rules · prepared __BUILD_DATE__ · all data stays in this file</div>
+    <div class="sub" id="hdr-sub">Prepared __BUILD_DATE__ · Tax year __TAX_YEAR__ · Private &amp; confidential</div>
   </div>
   <div class="toolbar">
     <button class="btn" id="btn-load-json" title="Load an updated client-data.json">Load data…</button>
@@ -354,7 +355,7 @@ footer.privacy {
   <section class="tabpane" id="pane-tax">
     <div class="card">
       <h2>Personal tax, year by year</h2>
-      <p class="cardnote">How the taxes each of you pays evolve under the wage-growth assumption. Change it here — every other chart and table updates too. Tax is always calculated individually, so each person has their own table below.</p>
+      <p class="cardnote">How each person's tax position develops under the wage-growth assumption. Adjust it here and every chart and table updates. Tax is calculated individually, so each of you has your own chart and table below.</p>
       <div class="controls" id="tax-controls"></div>
     </div>
     <div id="tax-sections"></div>
@@ -363,7 +364,7 @@ footer.privacy {
   <section class="tabpane" id="pane-networth">
     <div class="card">
       <h2>Net worth projection</h2>
-      <p class="cardnote">Each asset grows under its own assumption — edit the rates below and the chart recalculates.</p>
+      <p class="cardnote">Each asset grows under its own assumption, net of its charges — adjust the rates below and every projection updates.</p>
       <div class="chartbox" id="nw-chart"></div>
     </div>
     <div class="card">
@@ -378,8 +379,8 @@ footer.privacy {
 
   <section class="tabpane" id="pane-assets">
     <div class="card">
-      <h2>Assets, one at a time</h2>
-      <p class="cardnote">Pick any asset — including ones created by what-if events — and see exactly how it grows and reduces each year: growth and money added, withdrawals and sales out, and the closing balance.</p>
+      <h2>Each asset in detail</h2>
+      <p class="cardnote">Select any asset — including those created by scenario events — to see exactly how it builds and reduces each year: growth and money added, withdrawals and sales, and the closing balance.</p>
       <div class="controls" id="asset-controls"></div>
       <div class="chartbox" id="asset-chart"></div>
     </div>
@@ -442,7 +443,7 @@ footer.privacy {
   <section class="tabpane" id="pane-cashflow">
     <div class="card">
       <h2>Lifetime cash flow</h2>
-      <p class="cardnote">Bars stack every source of money in; the dark line is everything going out (spending, tax, debt payments). Red markers flag shortfall years. <strong>Click any year</strong> for its full breakdown.</p>
+      <p class="cardnote">The bars stack every source of money coming in each year; the line shows total outgoings — spending, tax, debt payments and saving. Red markers highlight any year where spending could not be fully met. <strong>Select any year</strong> for its full breakdown.</p>
       <div class="chartbox" id="cf-chart"></div>
     </div>
     <div class="card">
@@ -454,8 +455,8 @@ footer.privacy {
   <section class="tabpane" id="pane-whatif">
     <div class="grid2">
       <div class="card">
-        <h2>Life events &amp; what-ifs</h2>
-        <p class="cardnote">Toggle events on and off to see the plan re-project instantly. Everything is editable.</p>
+        <h2>Life events &amp; scenarios</h2>
+        <p class="cardnote">Switch events on or off and the whole plan recalculates instantly. Every event can be edited, duplicated in spirit or removed — nothing here is permanent.</p>
         <div class="event-list" id="event-list"></div>
         <p style="margin-top:12px"><button class="btn primary" id="btn-add-event">+ Add event</button></p>
       </div>
@@ -512,17 +513,17 @@ footer.privacy {
   <section class="tabpane active" id="pane-data">
     <div class="card">
       <h2>Plan inputs</h2>
-      <p class="cardnote">Everything the projection is built from. To change these figures, use “Load data…” with an updated client-data.json, or model changes as what-if events.</p>
+      <p class="cardnote">Everything the projection is built from — please check it is accurate and complete, as the plan is only as good as this information. Permanent corrections are made with your adviser; possible changes are best explored as scenarios on the What-if tab.</p>
       <div id="data-view"></div>
     </div>
   </section>
 </main>
 
 <footer class="privacy">
-  <strong>Privacy:</strong> this file is self-contained: your financial data never leaves it, nothing is stored
-  outside it, and all calculations run locally in your browser. The only network request is loading the display
-  fonts (no data is sent, and the plan works fully offline with system fonts). Treat the file itself as
-  confidential — it embeds the client's financial data. <strong>Important:</strong> this is an illustrative cash-flow model, not financial advice;
+  <strong>Privacy:</strong> this file is self-contained: your financial information never leaves it, nothing is
+  stored outside it, and all calculations run locally in your browser. The only network request is loading the
+  display fonts (no information is sent, and the plan works fully offline with system fonts). Please treat the
+  file itself as confidential — it contains your financial information. <strong>Important:</strong> this is an illustrative cash-flow model, not financial advice;
   projections depend on the assumptions shown, are not guaranteed, and tax rules may change.
 </footer>
 
@@ -653,6 +654,11 @@ function bizGrowthFor(b, y) {
   if (o.bizGrowth && o.bizGrowth[b.id] != null) return o.bizGrowth[b.id];
   return bizDefaultGrowth(b);
 }
+function bizMarginFor(b, y) {
+  const o = ovr(y);
+  if (o.bizMargin && o.bizMargin[b.id] != null) return o.bizMargin[b.id];
+  return b.profitMargin != null ? b.profitMargin : 0.15;
+}
 function bizMetrics(b, i) {
   const basis = b.valuationBasis || "multiple";
   let tf = 1, vf = 1;
@@ -665,7 +671,7 @@ function bizMetrics(b, i) {
     }
   }
   const turnover = (b.annualTurnover || 0) * tf;
-  const profit = turnover * (b.profitMargin != null ? b.profitMargin : 0.15);
+  const profit = turnover * bizMarginFor(b, i);
   const valuation = basis === "fixed"
     ? (b.valuationToday || 0) * vf
     : profit * (b.valuationMultiple != null ? b.valuationMultiple : 4);
@@ -1962,14 +1968,14 @@ function renderOverview() {
   renderNetWorthChart($("#ov-chart"), 300);
 
   const s = $("#ov-summary"); s.textContent = "";
-  s.append(el("h2", null, "How to read this plan"));
+  s.append(el("h2", null, "Reading this plan"));
   const names = d.people.map((p) => p.name.split(" ")[0]).join(" & ");
   const para = (t) => s.append(el("p", null, t));
   para(`This plan projects ${names}'s finances from ${rows[0].label} until age ${d.plan.endAge}, using tax year __TAX_YEAR__ rules. Income is taxed per person each year; spending, saving and withdrawals are then balanced across the household.`);
   para(`Assumptions: inflation ${fmtPct(d.assumptions.inflation)}, wage growth ${fmtPct(d.assumptions.wageGrowth)}, with each asset growing at its own rate (see Net worth tab). When spending exceeds income, money is drawn in this order: ${(d.assumptions.withdrawalOrder || []).map((t) => ASSET_TYPE_LABEL[t] || t).join(" → ")}.`);
   const active = d.events.filter((e) => e.enabled);
-  if (active.length) para(`What-if events currently switched on: ${active.map((e) => e.name).join("; ")}. The dashed line on charts shows the baseline without them.`);
-  para("Every figure here is an illustration based on the stated assumptions — not a guarantee, and not financial advice.");
+  if (active.length) para(`Scenarios currently included: ${active.map((e) => e.name).join("; ")}. The dashed line on the charts shows the baseline without them.`);
+  para("Every figure in this plan is an illustration built on the stated assumptions — it is not a guarantee of future outcomes, and not financial advice.");
 }
 
 /* ═══════════════════════════ render: net worth ═══════════════════════════ */
@@ -2210,7 +2216,7 @@ function renderCashflow() {
     mode: "bar",
     series: cashflowSeries(rows),
     labels: rows.map((r) => String(r.year)),
-    overlays: [{ name: "Total outgoings (spend + tax + debt + saving)", values: outflowValues(rows) }],
+    overlays: [{ name: "Total outgoings (spending, tax, debt & saving)", values: outflowValues(rows) }],
     markers: rows.map((r, i) => (r.shortfall > 0.5 ? { idx: i } : null)).filter(Boolean),
     height: 360,
     selectedIdx: state.selectedYear,
@@ -2267,7 +2273,7 @@ function openYearDrawer(i) {
   next.addEventListener("click", () => openYearDrawer(i + 1));
   nav.append(prev, next); dr.append(nav);
 
-  dr.append(el("p", { class: "cardnote" }, agesLabel(r) + (r.lumpNames.length ? " · events: " + r.lumpNames.join(", ") : "")));
+  dr.append(el("p", { class: "cardnote" }, agesLabel(r) + (r.lumpNames.length ? " · One-off events: " + r.lumpNames.join(", ") : "")));
 
   const section = (name, rows2, totalName, totalVal) => {
     dr.append(el("h3", { style: "margin-top:16px" }, name));
@@ -2331,7 +2337,7 @@ document.addEventListener("keydown", (e) => { if (e.key === "Escape") { $("#year
 function renderWhatIf() {
   const d = state.data;
   const list = $("#event-list"); list.textContent = "";
-  if (!d.events.length) list.append(el("p", { class: "cardnote" }, "No events yet — add one to explore “what if…?” with the client."));
+  if (!d.events.length) list.append(el("p", { class: "cardnote" }, "No scenarios yet — add a life event below to see how the plan responds."));
   for (const ev of d.events) {
     const tmpl = EVENT_TEMPLATES[ev.template];
     const card = el("div", { class: "event-card" + (ev.enabled ? "" : " disabled") });
@@ -2514,7 +2520,10 @@ function renderAssumptions() {
   const tbl = el("table", { class: "data" });
   const head = el("tr", null, el("th", null, "Year"), el("th", null, "Inflation %"), el("th", null, "Wage growth %"));
   for (const a of d.assets) head.append(el("th", null, a.name + " %"));
-  for (const b of d.businesses || []) head.append(el("th", null, b.name + " %"));
+  for (const b of d.businesses || []) {
+    head.append(el("th", null, b.name + " growth %"));
+    head.append(el("th", null, b.name + " margin %"));
+  }
   tbl.append(el("thead", null, head));
   const tb = el("tbody");
   const yo = d.assumptions.yearOverrides;
@@ -2548,6 +2557,13 @@ function renderAssumptions() {
           if (v == null) delete yo[String(i)].bizGrowth[b.id]; else yo[String(i)].bizGrowth[b.id] = v;
         },
         (bizDefaultGrowth(b) * 100).toFixed(1)));
+      tr.append(cell(
+        () => ((yo[String(i)] || {}).bizMargin || {})[b.id],
+        (v) => {
+          yo[String(i)].bizMargin = yo[String(i)].bizMargin || {};
+          if (v == null) delete yo[String(i)].bizMargin[b.id]; else yo[String(i)].bizMargin[b.id] = v;
+        },
+        ((b.profitMargin != null ? b.profitMargin : 0.15) * 100).toFixed(1)));
     }
     tb.append(tr);
   });
@@ -2600,7 +2616,7 @@ function renderAssetsTab() {
       el("td", null, start > 0.5 ? fmtGBP(start) : "—"),
       el("td", { class: inGrow < -0.5 ? "neg" : "" }, Math.abs(inGrow) > 0.5 ? (inGrow > 0 ? "+" : "−") + fmtGBP(Math.abs(inGrow)) : "—"),
       el("td", { class: out > 0.5 ? "neg" : "" }, out > 0.5 ? "−" + fmtGBP(out) : "—"),
-      el("td", null, end > 0.5 ? fmtGBP(end) : out > 0.5 ? "sold / emptied" : "—"));
+      el("td", null, end > 0.5 ? fmtGBP(end) : out > 0.5 ? "sold / fully withdrawn" : "—"));
     tr.addEventListener("click", () => openYearDrawer(i));
     tb.append(tr);
   });
@@ -2924,7 +2940,7 @@ function renderBusinesses() {
         b.dividendSplit[p.id] = clamp(parseFloat(inp.value) || 0, 0, 100);
         recompute();
       });
-      controls.append(field("Divis to " + p.name.split(" ")[0] + " %", inp));
+      controls.append(field("Dividends — " + p.name.split(" ")[0] + " %", inp));
     }
 
     const linkSel = (label, cur, onSet, filterType) => {
@@ -2947,7 +2963,7 @@ function renderBusinesses() {
     box.append(el("p", { class: "cardnote", style: "margin:10px 0 0" },
       `Today: turnover ${fmtCompact(m0.turnover)}, net profit ${fmtCompact(m0.profit)}, your share valued at ${fmtCompact(m0.valuation)}` +
       (b.dividendsDrawn > 0 ? `, drawing ${fmtCompact(b.dividendsDrawn)} in dividends (${bizSplitLabel(d, b)})` : "") +
-      `. Bespoke the growth year-by-year in the “${b.name}” column on the Assumptions tab.`));
+      `. Growth and profit margin can both be varied year by year in the “${b.name}” columns on the Assumptions tab.`));
     editors.append(box);
   }
 
@@ -3346,7 +3362,7 @@ function renderSDLT() {
 
     $("#sdlt-note").textContent = (res.note ? res.note + " " : "") +
       (res.surcharge > 0 ? "Rates shown include the " + fmtPct(res.surcharge) + " surcharge. " : "") +
-      "Tax year " + TAX.taxYear + " rates. Buying a property in a what-if? Enter this figure in the event's “Stamp duty & costs” box.";
+      "Tax year " + TAX.taxYear + " rates. Modelling a purchase on the What-if tab? Enter this figure in the event's “Stamp duty & costs” field.";
   };
   price.addEventListener("input", update);
   typeSel.addEventListener("change", update);
@@ -3660,6 +3676,9 @@ function renderAll() {
 }
 $("#hdr-title").textContent = state.data.plan.title || "Financial plan";
 document.title = state.data.plan.title || "Financial plan";
+if (state.data.plan.adviserName) {
+  $("#hdr-sub").textContent = "Prepared by " + state.data.plan.adviserName + " · " + $("#hdr-sub").textContent.replace("Prepared ", "");
+}
 recompute();
 </script>
 </body>
