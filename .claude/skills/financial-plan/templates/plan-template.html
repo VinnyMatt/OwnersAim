@@ -3483,32 +3483,204 @@ function renderIHT() {
 /* ═══════════════════════════ data view ═══════════════════════════ */
 function renderDataView() {
   const d = state.data, v = $("#data-view"); v.textContent = "";
-  const section = (name, headers, rows2) => {
-    if (!rows2.length) return;
-    if (name) v.append(el("h3", { style: "margin-top:14px" }, name));
+  const INCOME_TYPES = { employment: "Employment", selfEmployment: "Self-employment", dividend: "Dividends", rental: "Rental", dbPension: "DB pension", other: "Other" };
+  const SPEND_CATS = { essential: "Essential", lifestyle: "Lifestyle", luxury: "Luxury" };
+  const newId = (p) => p + "-" + Date.now().toString(36) + Math.floor(Math.random() * 100);
+
+  const heading = (t) => v.append(el("h3", { style: "margin-top:18px" }, t));
+  const startTable = (headers) => {
+    const wrap = el("div", { class: "tablewrap" });
     const t = el("table", { class: "data" });
     t.append(el("thead", null, el("tr", null, ...headers.map((h) => el("th", null, h)))));
-    const tb = el("tbody");
-    for (const row of rows2) tb.append(el("tr", null, ...row.map((c) => el("td", null, c))));
-    t.append(tb); v.append(t);
+    const tb = el("tbody"); t.append(tb); wrap.append(t); v.append(wrap);
+    return tb;
   };
-  section("", ["Name", "Born", "Retires at", "State Pension age"],
-    d.people.map((p) => [p.name, p.dateOfBirth, String(p.retirementAge), String(p.statePensionAge || TAX.pensions.statePensionAgeDefault)]));
-  section("Children", ["Name", "Born"], (d.children || []).map((c) => [c.name, c.dateOfBirth]));
-  section("Income", ["Source", "Owner", "Type", "Gross /yr", "From age", "To age"],
-    d.incomes.map((x) => [x.name, personName(d, x.ownerId), x.type, fmtGBP(x.grossAnnual), x.startAge != null ? String(x.startAge) : "now", x.endAge != null ? String(x.endAge) : (x.type === "employment" || x.type === "selfEmployment" ? "retirement" : "plan end")]));
-  section("Spending", ["Item", "Category", "Per year", "Grows with"],
-    d.expenditure.map((x) => [x.name, x.category || "—", fmtGBP(x.annual), x.growthRate != null ? fmtPct(x.growthRate) : "inflation"]));
-  section("Assets", ["Asset", "Owner", "Type", "Value", "Growth", "Contribution"],
-    d.assets.map((a) => [a.name, a.ownerId === "joint" ? "Joint" : personName(d, a.ownerId), ASSET_TYPE_LABEL[a.type] || a.type, fmtGBP(a.value), fmtPct(a.growthRate ?? 0.04),
-      a.type === "pension" && a.linkedIncomeId ? fmtPct(a.memberContributionPct || 0) + " + " + fmtPct(a.employerContributionPct || 0) + " employer" : fmtGBP(a.annualContribution || 0) + "/yr"]));
-  section("Businesses", ["Business", "Owner", "Ownership", "Turnover /yr", "Margin", "Valued by"],
-    (d.businesses || []).map((b) => [b.name, b.ownerId === "joint" ? "Joint" : personName(d, b.ownerId), fmtPct(b.ownershipPct != null ? b.ownershipPct : 1),
-      fmtGBP(b.annualTurnover || 0), fmtPct(b.profitMargin != null ? b.profitMargin : 0.15),
-      (b.valuationBasis || "multiple") === "multiple" ? (b.valuationMultiple != null ? b.valuationMultiple : 4) + "× profit" : "fixed value"]));
-  section("Debts", ["Debt", "Balance", "Rate", "Payment /yr"],
-    (d.liabilities || []).map((l) => [l.name, fmtGBP(l.balance), fmtPct(l.interestRate || 0), fmtGBP(l.annualPayment || 0)]));
+  const addBtn = (label, onClick) => {
+    const b = el("button", { class: "btn small", style: "margin-top:8px" }, "+ " + label);
+    b.addEventListener("click", onClick);
+    v.append(el("p", { style: "margin:0" }, b));
+  };
+  const txt = (obj, key, opts) => {
+    const inp = el("input", { type: (opts && opts.type) || "text", value: obj[key] != null ? obj[key] : "" });
+    if (opts && opts.width) inp.style.width = opts.width;
+    inp.addEventListener("change", () => { obj[key] = inp.value; recompute(); });
+    return inp;
+  };
+  const num = (obj, key, opts) => {
+    const o = opts || {};
+    const cur = obj[key];
+    const inp = el("input", {
+      type: "number", step: String(o.step || 1),
+      value: cur != null ? (o.pct ? (cur * 100).toFixed(1) : cur) : "",
+      placeholder: o.placeholder || "",
+    });
+    if (o.width) inp.style.width = o.width;
+    inp.addEventListener("change", () => {
+      if (inp.value === "" && o.nullable) obj[key] = null;
+      else obj[key] = o.pct ? (parseFloat(inp.value) || 0) / 100 : (parseFloat(inp.value) || 0);
+      recompute();
+    });
+    return inp;
+  };
+  const sel = (obj, key, options, onSet) => {
+    const s = el("select");
+    for (const [val, label] of options) s.append(el("option", { value: val }, label));
+    s.value = obj[key] != null ? obj[key] : options[0][0];
+    s.addEventListener("change", () => { obj[key] = s.value; if (onSet) onSet(s.value); recompute(); });
+    return s;
+  };
+  const ownerOptions = (withJoint) => {
+    const opts = d.people.map((p) => [p.id, p.name.split(" ")[0]]);
+    if (withJoint) opts.push(["joint", "Joint"]);
+    return opts;
+  };
+  const removeBtn = (coll, item) => {
+    const b = el("button", { class: "btn small danger" }, "Remove");
+    b.addEventListener("click", () => { d[coll] = d[coll].filter((x) => x !== item); recompute(); });
+    return b;
+  };
+  const td = (...c) => el("td", null, ...c);
+
+  // ── people ──
+  let tb = startTable(["Name", "Born", "Retires at", "State Pension age", ""]);
+  for (const p of d.people) {
+    tb.append(el("tr", null,
+      td(txt(p, "name", { width: "170px" })),
+      td(txt(p, "dateOfBirth", { type: "date" })),
+      td(num(p, "retirementAge", { width: "70px" })),
+      td(num(p, "statePensionAge", { width: "70px" })),
+      td()));
+  }
+
+  // ── children ──
+  heading("Children");
+  tb = startTable(["Name", "Born", ""]);
+  for (const c of d.children || []) {
+    const rm = el("button", { class: "btn small danger" }, "Remove");
+    rm.addEventListener("click", () => { d.children = d.children.filter((x) => x !== c); recompute(); });
+    tb.append(el("tr", null, td(txt(c, "name", { width: "170px" })), td(txt(c, "dateOfBirth", { type: "date" })), td(rm)));
+  }
+  addBtn("Add child", () => {
+    d.children = d.children || [];
+    d.children.push({ name: "Child", dateOfBirth: String(startYear - 5) + "-01-01" });
+    recompute();
+  });
+  const cbWrap = el("label", { style: "display:flex;align-items:center;gap:8px;font-size:13px;color:var(--text-secondary);margin-top:10px" });
+  const cb = el("input", { type: "checkbox" });
+  cb.checked = !!d.claimChildBenefit;
+  cb.addEventListener("change", () => { d.claimChildBenefit = cb.checked; recompute(); });
+  cbWrap.append(cb, "Child benefit is claimed");
+  v.append(cbWrap);
+
+  // ── income ──
+  heading("Income");
+  tb = startTable(["Source", "Owner", "Type", "Gross £/yr", "From age", "To age", "Growth %", ""]);
+  for (const inc of d.incomes) {
+    tb.append(el("tr", null,
+      td(txt(inc, "name", { width: "190px" })),
+      td(sel(inc, "ownerId", ownerOptions(false))),
+      td(sel(inc, "type", Object.entries(INCOME_TYPES))),
+      td(num(inc, "grossAnnual", { step: 500 })),
+      td(num(inc, "startAge", { nullable: true, placeholder: "now", width: "70px" })),
+      td(num(inc, "endAge", { nullable: true, placeholder: "auto", width: "70px" })),
+      td(num(inc, "growthRate", { pct: true, step: 0.1, nullable: true, placeholder: "default", width: "80px" })),
+      td(removeBtn("incomes", inc))));
+  }
+  addBtn("Add income", () => {
+    d.incomes.push({ id: newId("inc"), ownerId: d.people[0].id, type: "employment", name: "New income", grossAnnual: 0, startAge: null, endAge: null, growthRate: null });
+    recompute();
+  });
+  v.append(el("p", { class: "cardnote", style: "margin-top:6px" },
+    "Employment and self-employment stop at that person's retirement age unless a “To age” is set. Growth left blank follows the default (wage growth for earnings, inflation otherwise)."));
+
+  // ── spending ──
+  heading("Spending");
+  tb = startTable(["Item", "Category", "£/yr", "From age", "To age", "Growth %", ""]);
+  for (const ex of d.expenditure) {
+    tb.append(el("tr", null,
+      td(txt(ex, "name", { width: "260px" })),
+      td(sel(ex, "category", Object.entries(SPEND_CATS))),
+      td(num(ex, "annual", { step: 500 })),
+      td(num(ex, "startAge", { nullable: true, placeholder: "now", width: "70px" })),
+      td(num(ex, "endAge", { nullable: true, placeholder: "plan end", width: "70px" })),
+      td(num(ex, "growthRate", { pct: true, step: 0.1, nullable: true, placeholder: "inflation", width: "80px" })),
+      td(removeBtn("expenditure", ex))));
+  }
+  addBtn("Add spending", () => {
+    d.expenditure.push({ id: newId("exp"), name: "New spending", category: "lifestyle", annual: 0, startAge: null, endAge: null, growthRate: null });
+    recompute();
+  });
+
+  // ── assets ──
+  heading("Assets");
+  tb = startTable(["Asset", "Owner", "Type", "Value £", "Contribution", ""]);
+  for (const a of d.assets) {
+    const contribCell = el("td");
+    if (a.type === "pension" && a.linkedIncomeId != null) {
+      const stack = el("div", { style: "display:flex;flex-direction:column;gap:3px;align-items:flex-end" });
+      const line = (label, inp) => {
+        const w = el("div", { style: "display:flex;align-items:center;gap:6px;font-size:11px;color:var(--text-muted)" });
+        w.append(label, inp); return w;
+      };
+      stack.append(line("you %", num(a, "memberContributionPct", { pct: true, step: 0.5, width: "62px" })));
+      stack.append(line("employer %", num(a, "employerContributionPct", { pct: true, step: 0.5, width: "62px" })));
+      contribCell.append(stack);
+    } else {
+      contribCell.append(num(a, "annualContribution", { step: 500, width: "90px" }));
+    }
+    tb.append(el("tr", null,
+      td(el("span", { class: "swatch", style: `background:var(--s${slotFor(a.id)});opacity:${opacityFor(a.id)}` }), txt(a, "name", { width: "200px" })),
+      td(sel(a, "ownerId", ownerOptions(true))),
+      td(sel(a, "type", Object.entries(ASSET_TYPE_LABEL))),
+      td(num(a, "value", { step: 1000 })),
+      contribCell,
+      td(removeBtn("assets", a))));
+  }
+  addBtn("Add asset", () => {
+    d.assets.push({ id: newId("asset"), ownerId: d.people[0].id, type: "cash", name: "New asset", value: 0, growthRate: 0.04, annualContribution: 0, contributionEndAge: null });
+    recompute();
+  });
+  v.append(el("p", { class: "cardnote", style: "margin-top:6px" },
+    "Growth rates, fees, funds and provider details are managed on the Assumptions, Pensions and Investments tabs. A pension linked to a salary shows its contribution percentages here."));
+
+  // ── debts ──
+  heading("Debts");
+  tb = startTable(["Debt", "Balance £", "Rate %", "Payment £/yr", ""]);
+  for (const l of d.liabilities || []) {
+    tb.append(el("tr", null,
+      td(txt(l, "name", { width: "230px" })),
+      td(num(l, "balance", { step: 1000 })),
+      td(num(l, "interestRate", { pct: true, step: 0.05, width: "80px" })),
+      td(num(l, "annualPayment", { step: 100 })),
+      td(removeBtn("liabilities", l))));
+  }
+  addBtn("Add debt", () => {
+    d.liabilities = d.liabilities || [];
+    d.liabilities.push({ id: newId("debt"), name: "New debt", type: "loan", balance: 0, interestRate: 0.05, annualPayment: 0, linkedAssetId: null });
+    recompute();
+  });
+
+  section2Businesses(v, d);
 }
+
+function section2Businesses(v, d) {
+  if (!(d.businesses || []).length) return;
+  v.append(el("h3", { style: "margin-top:18px" }, "Businesses"));
+  const wrap = el("div", { class: "tablewrap" });
+  const t = el("table", { class: "data" });
+  t.append(el("thead", null, el("tr", null, ...["Business", "Owner", "Ownership", "Turnover /yr", "Margin", "Valued by"].map((h) => el("th", null, h)))));
+  const tb = el("tbody");
+  for (const b of d.businesses) {
+    tb.append(el("tr", null,
+      el("td", null, b.name), el("td", null, b.ownerId === "joint" ? "Joint" : personName(d, b.ownerId)),
+      el("td", null, fmtPct(b.ownershipPct != null ? b.ownershipPct : 1)),
+      el("td", null, fmtGBP(b.annualTurnover || 0)), el("td", null, fmtPct(b.profitMargin != null ? b.profitMargin : 0.15)),
+      el("td", null, (b.valuationBasis || "multiple") === "multiple" ? (b.valuationMultiple != null ? b.valuationMultiple : 4) + "× profit" : "fixed value")));
+  }
+  t.append(tb); wrap.append(t); v.append(wrap);
+  v.append(el("p", { class: "cardnote", style: "margin-top:6px" }, "Businesses are edited on the Businesses owned tab."));
+}
+
 
 /* ═══════════════════════════ exports ═══════════════════════════ */
 function download(filename, blob) {
