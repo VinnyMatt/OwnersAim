@@ -444,7 +444,7 @@ footer.privacy {
       <h2>Debts</h2>
       <p class="cardnote">Each debt amortises from its own interest rate and payment. What-if events that add borrowing (e.g. a new mortgage) appear here automatically.</p>
       <div class="tablewrap" id="debt-summary"></div>
-      <p class="cardnote" id="debt-offset-note" style="margin-top:8px">The <strong>Offset savings</strong> control links cash to a mortgage: the offset slice earns no interest (and none is taxed), and mortgage interest is only charged on the balance above it.</p>
+      <p class="cardnote" id="debt-offset-note" style="margin-top:8px">The <strong>Offset savings</strong> control links cash to a mortgage: the offset slice earns no interest (and none is taxed), and mortgage interest is only charged on the balance above it. Balances also reflect any <strong>extra repayments</strong> directed here by the surplus plan (Assumptions tab) or an overpayment what-if — the year-by-year table shows them in their own column.</p>
     </div>
     <div class="card">
       <h3>Overpayment calculator</h3>
@@ -1573,7 +1573,7 @@ function runProjection(d, events) {
 
     // ── withdrawals (deficit) or surplus allocation ──
     let withdrawals = [], withdrawalTax = 0, cgtPaid = 0, shortfall = 0, surplusTotal = 0;
-    const surplusUses = [];
+    const surplusUses = [], extraDebtPay = {};
     if (flow < -0.5) {
       let need = -flow;
       const order = d.assumptions.withdrawalOrder || ["cash", "gia", "isa", "pension"];
@@ -1679,6 +1679,7 @@ function runProjection(d, events) {
             if (l) {
               const pay = Math.min(amt, l.bal);
               l.bal -= pay; surplus -= pay;
+              extraDebtPay[l.id] = (extraDebtPay[l.id] || 0) + pay;
               surplusUses.push({ name: "Paid down " + l.name, amount: pay });
             }
           }
@@ -1765,7 +1766,7 @@ function runProjection(d, events) {
       spendTotal, spendItems, debtPay, debtInterest,
       pensionContribTotal, employerContribTotal, plannedSavings,
       incomeItems, withdrawals, lumpIn, lumpOut, lumpNames: [...cbLumpNames],
-      shortfall, surplusSaved: surplusTotal, surplusUses, pensionWarnings,
+      shortfall, surplusSaved: surplusTotal, surplusUses, extraDebtPay, pensionWarnings,
       assets: assetBals, assetOut, assetTotal, liabs: liabBals, liabTotal, offsets: liabOffset, netWorth: assetTotal - liabTotal,
       inflFactor: infl,
     });
@@ -3270,7 +3271,8 @@ function renderDebts() {
       el("td", null, fmtGBP(m.balance != null ? m.balance : bal0)),
       offsetCell,
       el("td", null, m.rate != null ? fmtGBP(interestOf(m)) : "—"),
-      el("td", null, repaidIn(m.id))));
+      el("td", null, repaidIn(m.id) +
+        (rows.some((r) => ((r.extraDebtPay || {})[m.id] || 0) > 0.5) ? " · accelerated by surplus" : ""))));
   }
   const trTot = el("tr", null);
   trTot.append(el("td", null, el("strong", null, "Total")), el("td", null, ""),
@@ -3295,10 +3297,13 @@ function renderDebts() {
   });
 
   const wrap = $("#debt-table"); wrap.textContent = "";
+  const anyExtra = rows.some((r) => sum(Object.values(r.extraDebtPay || {})) > 0.5);
   const t2 = el("table", { class: "data" });
   const hr = el("tr", null, el("th", null, "Year"), el("th", null, "Ages"));
   meta.forEach((m) => hr.append(el("th", null, m.name)));
-  hr.append(el("th", null, "Interest paid"), el("th", null, "Payments made"), el("th", null, "Total debt"));
+  hr.append(el("th", null, "Interest paid"), el("th", null, "Payments made"));
+  if (anyExtra) hr.append(el("th", null, "Extra repayments"));
+  hr.append(el("th", null, "Total debt"));
   t2.append(el("thead", null, hr));
   const tb2 = el("tbody");
   rows.forEach((r, i) => {
@@ -3312,6 +3317,10 @@ function renderDebts() {
     });
     tr.append(el("td", null, r.debtInterest > 0.5 ? fmtGBP(r.debtInterest) : "—"));
     tr.append(el("td", null, r.debtPay > 0.5 ? fmtGBP(r.debtPay) : "—"));
+    if (anyExtra) {
+      const ex = sum(Object.values(r.extraDebtPay || {}));
+      tr.append(el("td", null, ex > 0.5 ? fmtGBP(ex) : "—"));
+    }
     tr.append(el("td", null, r.liabTotal >= 1 ? fmtGBP(r.liabTotal) : "repaid"));
     tr.addEventListener("click", () => openYearDrawer(i));
     tb2.append(tr);
