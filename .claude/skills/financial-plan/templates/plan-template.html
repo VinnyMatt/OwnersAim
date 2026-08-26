@@ -1176,8 +1176,17 @@ function runProjection(d, events) {
       if (!info || info.sold || info.soldThisYear) continue;
       const amount = bizDividends(b, i);
       if (amount <= 0) continue;
-      if (b.ownerId && b.ownerId !== "joint" && !alive[b.ownerId]) continue;
-      const owners = shareOwners(d, b.ownerId || d.people[0].id, alive);
+      // explicit per-person allocation wins; shares re-normalise across survivors
+      let owners = null;
+      if (b.dividendSplit) {
+        const entries = Object.entries(b.dividendSplit).filter(([pid, pct]) => pct > 0 && alive[pid]);
+        const tot = sum(entries.map(([, pct]) => pct));
+        if (tot > 0) owners = entries.map(([pid, pct]) => [pid, pct / tot]);
+      }
+      if (!owners) {
+        if (b.ownerId && b.ownerId !== "joint" && !alive[b.ownerId]) continue;
+        owners = shareOwners(d, b.ownerId || d.people[0].id, alive);
+      }
       for (const [pid, share] of owners) {
         const pp = perPerson[pid];
         pp.gross += amount * share;
@@ -2298,6 +2307,12 @@ function renderAssumptions() {
 }
 
 /* ═══════════════════════════ businesses owned ═══════════════════════════ */
+function bizSplitLabel(d, b) {
+  if (!b.dividendSplit) return "taxed to " + (b.ownerId === "joint" ? "both, split evenly" : personName(d, b.ownerId || d.people[0].id));
+  const entries = Object.entries(b.dividendSplit).filter(([, pct]) => pct > 0);
+  const tot = sum(entries.map(([, pct]) => pct)) || 1;
+  return entries.map(([pid, pct]) => personName(d, pid) + " " + Math.round((pct / tot) * 100) + "%").join(" / ") || "no one — set a split";
+}
 function renderBusinesses() {
   const d = state.data, rows = state.proj;
   const editors = $("#biz-editors"); editors.textContent = "";
@@ -2355,6 +2370,25 @@ function renderBusinesses() {
     dgInp.addEventListener("change", () => { b.dividendsGrowth = dgInp.value === "" ? null : (parseFloat(dgInp.value) || 0) / 100; recompute(); });
     controls.append(field("Dividends growth %/yr", dgInp));
 
+    // dividend allocation between the people (defaults to the owner)
+    const defaultSplit = () => {
+      const s = {};
+      if ((b.ownerId || d.people[0].id) === "joint") d.people.forEach((p) => (s[p.id] = Math.round(100 / d.people.length)));
+      else s[b.ownerId || d.people[0].id] = 100;
+      return s;
+    };
+    for (const p of d.people) {
+      const cur = b.dividendSplit ? (b.dividendSplit[p.id] || 0) : defaultSplit()[p.id] || 0;
+      const inp = el("input", { type: "number", step: "5", min: "0", max: "100", value: cur });
+      inp.style.width = "70px";
+      inp.addEventListener("change", () => {
+        b.dividendSplit = b.dividendSplit || defaultSplit();
+        b.dividendSplit[p.id] = clamp(parseFloat(inp.value) || 0, 0, 100);
+        recompute();
+      });
+      controls.append(field("Divis to " + p.name.split(" ")[0] + " %", inp));
+    }
+
     const linkSel = (label, cur, onSet, filterType) => {
       const sel = el("select");
       sel.append(el("option", { value: "" }, "None"));
@@ -2374,7 +2408,7 @@ function renderBusinesses() {
     const m0 = bizMetrics(b, 0);
     box.append(el("p", { class: "cardnote", style: "margin:10px 0 0" },
       `Today: turnover ${fmtCompact(m0.turnover)}, net profit ${fmtCompact(m0.profit)}, your share valued at ${fmtCompact(m0.valuation)}` +
-      (b.dividendsDrawn > 0 ? `, drawing ${fmtCompact(b.dividendsDrawn)} in dividends (taxed to the owner)` : "") +
+      (b.dividendsDrawn > 0 ? `, drawing ${fmtCompact(b.dividendsDrawn)} in dividends (${bizSplitLabel(d, b)})` : "") +
       `. Bespoke the growth year-by-year in the “${b.name}” column on the Assumptions tab.`));
     editors.append(box);
   }

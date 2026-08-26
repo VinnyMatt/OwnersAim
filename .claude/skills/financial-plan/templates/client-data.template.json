@@ -158,8 +158,9 @@
         "profitMargin": 0.18, "valuationMultiple": 4,
         "valuationToday": 0, "growthRate": 0.03,
         "dividendsDrawn": 20000, "dividendsGrowth": null,
+        "dividendSplit": { "client": 60, "partner": 40 },
         "salaryIncomeId": "salary-client", "dividendIncomeId": null,
-        "_dividends_note": "dividendsDrawn adds that much dividend income to the owner directly (today's £; tracks business growth unless dividendsGrowth is set). Use dividendIncomeId ONLY to tag an income entry that already exists in incomes[] — don't use both or the dividends double-count. Growth is overridable year-by-year in assumptions.yearOverrides[i].bizGrowth[bizId]."
+        "_dividends_note": "dividendsDrawn adds that much dividend income directly (today's £; tracks business growth unless dividendsGrowth is set). dividendSplit allocates it between people by percentage (shares are normalised, and re-normalise across survivors if someone dies); omit it to tax the owner (joint = even split). Use dividendIncomeId ONLY to tag an income entry that already exists in incomes[] — don't use both or the dividends double-count. Growth is overridable year-by-year in assumptions.yearOverrides[i].bizGrowth[bizId]."
       }
     }
   ],
