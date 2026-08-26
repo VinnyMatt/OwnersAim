@@ -42,6 +42,9 @@ lifetime cash-flow plan** for a client. The output is a single local HTML file b
      essential + lifestyle figures.
    - Assets: cash, ISAs, GIAs, pensions (with member/employer contribution % and the salary
      they're linked to), property. Current value + any bespoke growth rate the user wants.
+     Where available also capture provider, fund name, asset allocation and annual fee %
+     per asset — these power the Pensions and Investments education tabs, and fees are
+     deducted from the (gross) growth rate in the projection.
    - Liabilities: mortgages/loans — balance, rate, annual payment.
    - Businesses owned (if any): turnover, growth, profit margin, valuation basis
      (profit multiple or fixed value), ownership %, and which salary/dividend income

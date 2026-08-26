@@ -111,7 +111,13 @@
       "value": 40000,
       "growthRate": 0.05,
       "annualContribution": 3600,
-      "contributionEndAge": null
+      "contributionEndAge": null,
+      "provider": "Platform name",
+      "fundName": "Global equity index fund",
+      "allocation": { "equities": 100 },
+      "annualFeePct": 0.4,
+      "notes": "",
+      "_education_note": "provider/fundName/allocation ({equities,bonds,property,cash} percentages)/annualFeePct/notes are optional on any asset — they power the Pensions and Investments education tabs, and annualFeePct is deducted from the (gross) growthRate in the projection."
     },
     {
       "id": "gia-client",

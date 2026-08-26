@@ -330,6 +330,8 @@ footer.privacy {
   <button data-tab="tax">Tax</button>
   <button data-tab="networth">Net worth</button>
   <button data-tab="assets">Assets</button>
+  <button data-tab="pensions">Pensions</button>
+  <button data-tab="investments">Investments</button>
   <button data-tab="business">Businesses owned</button>
   <button data-tab="debts">Debts</button>
   <button data-tab="cashflow">Cash flow</button>
@@ -385,6 +387,19 @@ footer.privacy {
       <h3 id="asset-table-title">Year by year</h3>
       <div class="tablewrap" id="asset-table"></div>
     </div>
+  </section>
+
+  <section class="tabpane" id="pane-pensions">
+    <div class="tiles" id="pn-tiles"></div>
+    <div id="pn-cards"></div>
+    <div class="card" id="pn-state"></div>
+    <div class="card" id="pn-education"></div>
+  </section>
+
+  <section class="tabpane" id="pane-investments">
+    <div class="tiles" id="inv-tiles"></div>
+    <div id="inv-cards"></div>
+    <div class="card" id="inv-education"></div>
   </section>
 
   <section class="tabpane" id="pane-business">
@@ -617,9 +632,11 @@ function inflationFor(i) { const o = ovr(i); return o.inflation != null ? o.infl
 function wageGrowthFor(i) { const o = ovr(i); return o.wageGrowth != null ? o.wageGrowth : state.data.assumptions.wageGrowth; }
 function assetGrowthFor(asset, i) {
   const o = ovr(i);
-  if (o.growth && o.growth[asset.id] != null) return o.growth[asset.id];
-  return asset.growthRate != null ? asset.growthRate : 0.04;
+  const fee = (asset.annualFeePct || 0) / 100;   // growth assumptions are gross; fees drag on them
+  if (o.growth && o.growth[asset.id] != null) return o.growth[asset.id] - fee;
+  return (asset.growthRate != null ? asset.growthRate : 0.04) - fee;
 }
+const netGrowthOf = (a) => (a.growthRate != null ? a.growthRate : 0.04) - (a.annualFeePct || 0) / 100;
 const cumFactor = (rateFn, uptoIdx) => { let f = 1; for (let i = 1; i <= uptoIdx; i++) f *= 1 + rateFn(i); return f; };
 
 /* business growth model: turnover → profit → valuation (owned share).
@@ -1604,7 +1621,9 @@ function runProjection(d, events) {
       let isaRoom = TAX.isa.annualAllowance * adults;
       for (const typ of d.assumptions.surplusOrder || ["isa", "gia", "cash"]) {
         if (surplus <= 0.5) break;
-        const pool = assets.filter((a) => a.type === typ && !a.sold);
+        // sweep into the best home of this type (highest net-of-fee growth)
+        const pool = assets.filter((a) => a.type === typ && !a.sold && !a.isBusiness && !a.isBtlCompany)
+          .sort((x, y) => netGrowthOf(y) - netGrowthOf(x));
         if (!pool.length) continue;
         let put = surplus;
         if (typ === "isa") put = Math.min(put, isaRoom);
@@ -2016,11 +2035,13 @@ function renderGrowthTable(wrap) {
   const tbl = el("table", { class: "data" });
   tbl.append(el("thead", null, el("tr", null,
     el("th", null, "Asset"), el("th", null, "Type"), el("th", null, "Value today"),
-    el("th", null, "Growth %/yr"), el("th", null, "Contribution /yr"))));
+    el("th", null, "Growth %/yr (gross)"), el("th", null, "Fee %/yr"), el("th", null, "Net %/yr"), el("th", null, "Contribution /yr"))));
   const tb = el("tbody");
   for (const a of state.data.assets) {
     const inp = el("input", { type: "number", step: "0.1", value: ((a.growthRate ?? 0.04) * 100).toFixed(1) });
     inp.addEventListener("change", () => { a.growthRate = (parseFloat(inp.value) || 0) / 100; recompute(); });
+    const feeInp = el("input", { type: "number", step: "0.05", value: a.annualFeePct != null ? a.annualFeePct : "", placeholder: "0" });
+    feeInp.addEventListener("change", () => { a.annualFeePct = feeInp.value === "" ? null : parseFloat(feeInp.value) || 0; recompute(); });
     const contribution = a.type === "pension" && a.linkedIncomeId
       ? fmtPct(a.memberContributionPct || 0) + " + " + fmtPct(a.employerContributionPct || 0) + " er"
       : fmtGBP(a.annualContribution || 0);
@@ -2031,6 +2052,8 @@ function renderGrowthTable(wrap) {
       el("td", null, ASSET_TYPE_LABEL[a.type] || a.type),
       el("td", null, fmtGBP(a.value)),
       el("td", null, inp),
+      el("td", null, feeInp),
+      el("td", null, fmtPct(netGrowthOf(a))),
       el("td", null, contribution)));
   }
   tbl.append(tb); wrap.append(tbl);
@@ -2584,6 +2607,241 @@ function renderAssetsTab() {
   tbl.append(tb); wrap.append(tbl);
   wrap.append(el("p", { class: "cardnote", style: "margin-top:10px" },
     "“Growth & money in” combines investment growth with contributions, surplus savings and transfers in; “Withdrawn / sold” is money taken out to fund spending plus sale values. Rows outside the asset's life are hidden."));
+}
+
+/* ═══════════════════════════ pensions & investments (education) ═══════════════════════════ */
+const ALLOC_META = [["equities", "Equities", 1], ["bonds", "Bonds", 5], ["property", "Property", 4], ["cash", "Cash", 3]];
+
+function renderAllocBar(alloc) {
+  const box = el("div");
+  const entries = ALLOC_META.filter(([k]) => (alloc[k] || 0) > 0);
+  const total = sum(entries.map(([k]) => alloc[k])) || 1;
+  const bar = el("div", { style: "display:flex;height:14px;border-radius:7px;overflow:hidden;gap:2px;margin:6px 0 4px" });
+  for (const [k, , slot] of entries) {
+    bar.append(el("div", { style: `width:${(alloc[k] / total) * 100}%;background:var(--s${slot})` }));
+  }
+  const legend = el("div", { class: "chart-legend", style: "margin-top:2px" });
+  for (const [k, label, slot] of entries) {
+    const item = el("span", { class: "item" });
+    item.append(el("span", { class: "swatch", style: `background:var(--s${slot})` }), `${label} ${Math.round((alloc[k] / total) * 100)}%`);
+    legend.append(item);
+  }
+  box.append(bar, legend);
+  return box;
+}
+
+/* simplified level-contribution compound, used only for the fee illustration */
+function feeDrag(a, annualContribution, years, benchmarkFeePct) {
+  const grow = (feePct) => {
+    let bal = a.value;
+    const r = (a.growthRate != null ? a.growthRate : 0.04) - feePct / 100;
+    for (let y = 0; y < years; y++) bal = bal * (1 + r) + annualContribution;
+    return bal;
+  };
+  const current = grow(a.annualFeePct || 0);
+  const cheap = grow(benchmarkFeePct);
+  return { current, cheap, saved: cheap - current, years };
+}
+
+function pensionContributionNow(a, d) {
+  let member = 0, employer = 0;
+  const linked = a.linkedIncomeId && d.incomes.find((x) => x.id === a.linkedIncomeId);
+  if (linked) {
+    member = linked.grossAnnual * (a.memberContributionPct || 0);
+    employer = linked.grossAnnual * (a.employerContributionPct || 0);
+  }
+  member += a.annualContribution || 0;
+  return { member, employer, total: member + employer };
+}
+
+function retirementIdxOf(d, ownerId) {
+  const p = d.people.find((x) => x.id === ownerId) || d.people[0];
+  return clamp(p.retirementAge - ageIn(p, 0), 0, planYears() - 1);
+}
+
+function eduBlock(container, title, ...paras) {
+  container.append(el("h3", { style: "margin-top:18px" }, title));
+  for (const t of paras) container.append(el("p", { style: "color:var(--text-secondary);font-size:13.5px" }, t));
+}
+
+function assetDetailCard(a, d, kindLabel, explain) {
+  const card = el("div", { class: "card" });
+  const owner = a.ownerId === "joint" ? "Joint" : personName(d, a.ownerId);
+  card.append(el("h3", null, a.name));
+  card.append(el("p", { class: "cardnote" }, kindLabel + " · " + owner + (a.provider ? " · " + a.provider : "")));
+
+  const grid = el("div", { class: "grid2" });
+
+  // what it is & what's going in
+  const left = el("div");
+  left.append(el("p", null, explain));
+  const facts = el("table", { class: "data" }); const tb = el("tbody");
+  const fact = (k, v) => tb.append(el("tr", null, el("td", null, k), el("td", null, v)));
+  fact("Value today", fmtGBP(a.value));
+  if (a.type === "pension") {
+    const c = pensionContributionNow(a, d);
+    if (c.total > 0) {
+      fact("Your contribution", fmtGBP(c.member) + "/yr" + (a.memberContributionPct ? " (" + fmtPct(a.memberContributionPct) + " of salary)" : ""));
+      fact("Employer adds", fmtGBP(c.employer) + "/yr" + (a.employerContributionPct ? " (" + fmtPct(a.employerContributionPct) + ")" : ""));
+      fact("Going in each year", fmtGBP(c.total));
+    } else {
+      fact("Contributions", "none — this pot is no longer being paid into");
+    }
+  } else if (a.annualContribution > 0) {
+    fact("You add", fmtGBP(a.annualContribution) + "/yr");
+  }
+  const retIdx = retirementIdxOf(d, a.ownerId === "joint" ? d.people[0].id : a.ownerId);
+  const atRet = (state.proj[retIdx].assets[a.id] || 0);
+  if (atRet > 0.5) fact("Projected at retirement (" + state.proj[retIdx].label + ")", fmtGBP(atRet));
+  facts.append(tb); left.append(facts);
+  grid.append(left);
+
+  // invested in / performance / fees
+  const right = el("div");
+  right.append(el("h3", { style: "font-size:13px" }, "What it's invested in"));
+  if (a.fundName) right.append(el("p", { style: "margin:0 0 2px" }, a.fundName));
+  if (a.allocation) right.append(renderAllocBar(a.allocation));
+  else right.append(el("p", { class: "cardnote" }, "Fund details not captured yet — worth requesting the latest statement."));
+
+  right.append(el("h3", { style: "font-size:13px;margin-top:14px" }, "Performance & fees"));
+  const pf = el("table", { class: "data" }); const tb2 = el("tbody");
+  const row = (k, v) => tb2.append(el("tr", null, el("td", null, k), el("td", null, v)));
+  row("Assumed growth (gross)", fmtPct(a.growthRate ?? 0.04) + "/yr");
+  row("Annual fee", a.annualFeePct != null ? a.annualFeePct + "%" : "not captured");
+  row("Net growth used in this plan", fmtPct(netGrowthOf(a)) + "/yr");
+  if (a.annualFeePct != null) row("Fee cost this year", fmtGBP(a.value * a.annualFeePct / 100));
+  pf.append(tb2); right.append(pf);
+
+  if (a.annualFeePct != null && a.annualFeePct > 0.35 && a.value > 0) {
+    const years = Math.max(5, retIdx);
+    const contrib = a.type === "pension" ? pensionContributionNow(a, d).total : (a.annualContribution || 0);
+    const drag = feeDrag(a, contrib, years, 0.3);
+    if (drag.saved > 500) {
+      right.append(el("p", { class: "cardnote", style: "margin-top:8px" },
+        `Fee drag: at ${a.annualFeePct}% this pot projects to ${fmtCompact(drag.current)} in ${years} years; at a low-cost 0.3% it would be ${fmtCompact(drag.cheap)} — a difference of ${fmtCompact(drag.saved)}. (Simplified level-contribution illustration.)`));
+    }
+  }
+  if (a.notes) right.append(el("p", { class: "cardnote", style: "margin-top:8px" }, a.notes));
+  grid.append(right);
+  card.append(grid);
+  return card;
+}
+
+function renderPensions() {
+  const d = state.data, rows = state.proj;
+  const pensions = d.assets.filter((a) => a.type === "pension");
+
+  const tiles = $("#pn-tiles"); tiles.textContent = "";
+  const totalNow = sum(pensions.map((a) => a.value));
+  const contribs = sum(pensions.map((a) => pensionContributionNow(a, d).total));
+  const retIdx = retirementIdxOf(d, d.people[0].id);
+  const atRet = sum(pensions.map((a) => rows[retIdx].assets[a.id] || 0));
+  const feeNow = sum(pensions.map((a) => a.value * (a.annualFeePct || 0) / 100));
+  tiles.append(
+    tile("Pension wealth today", fmtCompact(totalNow)),
+    tile("Going in each year", fmtCompact(contribs)),
+    tile("Projected at retirement", fmtCompact(atRet)),
+    tile("Fees this year", feeNow > 0.5 ? fmtGBP(feeNow) : "not captured"),
+  );
+
+  const cards = $("#pn-cards"); cards.textContent = "";
+  for (const a of pensions) {
+    const explain = a.linkedIncomeId
+      ? "A defined-contribution workplace pension: a pot of invested money. Contributions go in from your salary before tax, your employer adds its own money on top, and the pot rises and falls with the investments inside it."
+      : "A defined-contribution pension pot from earlier employment. Nothing new is going in, but it stays invested and keeps growing (and being charged) until you draw on it.";
+    cards.append(assetDetailCard(a, d, "Defined-contribution pension", explain));
+  }
+  if (!pensions.length) cards.append(el("div", { class: "card" }, el("p", { class: "cardnote" }, "No pensions captured in the plan yet.")));
+
+  // State Pension card
+  const sp = $("#pn-state"); sp.textContent = "";
+  sp.append(el("h2", null, "State Pension"));
+  const t = el("table", { class: "data" }); const tb = el("tbody");
+  tb.append(el("tr", null, ...["Who", "From age", "Amount (today's rates)", "Starts in"].map((h) => el("th", null, h))));
+  for (const p of d.people) {
+    if (!p.receivesStatePension) continue;
+    const spa = p.statePensionAge || TAX.pensions.statePensionAgeDefault;
+    const idx = clamp(spa - ageIn(p, 0), 0, rows.length - 1);
+    const amount = TAX.pensions.statePensionWeekly * 52 * (p.statePensionProportion == null ? 1 : p.statePensionProportion);
+    tb.append(el("tr", null,
+      el("td", null, p.name),
+      el("td", null, String(spa)),
+      el("td", null, fmtGBP(amount) + "/yr (" + fmtGBP(TAX.pensions.statePensionWeekly) + "/wk)"),
+      el("td", null, rows[idx].label)));
+  }
+  t.append(tb); sp.append(t);
+  sp.append(el("p", { class: "cardnote", style: "margin-top:8px" },
+    "The full new State Pension needs 35 qualifying years of National Insurance (minimum 10). It is uprated by the “triple lock” — the highest of earnings growth, inflation or 2.5% — which is how this plan projects it. Action: get a State Pension forecast at gov.uk/check-state-pension and check both NI records."));
+
+  // education
+  const ed = $("#pn-education"); ed.textContent = "";
+  ed.append(el("h2", null, "Understanding your pensions"));
+  eduBlock(ed, "How a pension pot actually works",
+    "A defined-contribution pension is simply a pot of investments with generous tax rules around it. Money goes in before tax, grows free of income tax and capital gains tax, and is taxed only when you draw it out. The pot is yours — changing jobs never takes it away.");
+  eduBlock(ed, "Why the contributions are the best deal you'll get",
+    "Every £100 you put in only costs you £80 as a basic-rate taxpayer, or £60 at higher rate, because of tax relief — and your employer's contribution is extra pay you don't get any other way. Opting out of a workplace pension means refusing part of your salary.");
+  eduBlock(ed, "What the money is invested in",
+    "Each pot sits in funds — typically a spread of global company shares (equities) for long-term growth, with bonds to steady the ride. “Lifestyle” or “default” strategies automatically move you from equities toward bonds as retirement approaches. The right mix depends on how far away retirement is and how much short-term fall you can live with; a pot untouched for 15+ years can usually afford to hold more equities than a cautious default.",
+    "If a strategy hasn't been reviewed for a few years it may no longer match your retirement age or risk comfort — that review costs nothing and is usually the single most valuable pension action.");
+  eduBlock(ed, "When and how you can take it",
+    `From age ${TAX.pensions.normalMinimumPensionAge} you can start drawing. Usually 25% of each withdrawal is tax-free (capped at ${fmtGBP(TAX.pensions.lumpSumAllowance)} across your lifetime); the rest is taxed as income in the year you take it — which is why spreading withdrawals across years, as this plan models, usually beats taking large lumps.`);
+  eduBlock(ed, "Old pots deserve attention",
+    "For each old pension, ask the provider: what am I being charged, what is it invested in, are there any valuable guarantees I'd lose by moving, and any exit fees? High charges on a forgotten pot compound into serious money over decades — the fee figures above show what's at stake.");
+  eduBlock(ed, "When you die",
+    "Pension pots pass outside your will via the provider's nomination form — check both of yours name the right people. From April 2027 unused pension funds count as part of your estate for inheritance tax (see the Inheritance tax tab), which makes nominations and the order you spend assets in retirement worth revisiting.");
+  ed.append(el("p", { class: "cardnote", style: "margin-top:14px" },
+    "This page is education, not advice: it explains what you own and how the rules work, using this plan's assumptions. Decisions about moving or choosing investments may need regulated financial advice."));
+}
+
+function renderInvestments() {
+  const d = state.data, rows = state.proj;
+  const invTypes = ["isa", "gia", "cash"];
+  const invs = d.assets.filter((a) => invTypes.includes(a.type));
+  const isas = invs.filter((a) => a.type === "isa");
+
+  const tiles = $("#inv-tiles"); tiles.textContent = "";
+  const investedNow = sum(invs.filter((a) => a.type !== "cash").map((a) => a.value));
+  const cashNow = sum(invs.filter((a) => a.type === "cash").map((a) => a.value));
+  const isaContrib = sum(isas.map((a) => a.annualContribution || 0));
+  const adults = d.people.length;
+  tiles.append(
+    tile("Invested (ISAs & GIA)", fmtCompact(investedNow)),
+    tile("Cash", fmtCompact(cashNow)),
+    tile("ISA saving planned", fmtCompact(isaContrib) + "/yr", { text: "allowance " + fmtCompact(TAX.isa.annualAllowance * adults) + "/yr household", dir: "" }),
+    tile("Emergency fund target", fmtCompact(d.assumptions.cashBufferTarget || 0)),
+  );
+
+  const cards = $("#inv-cards"); cards.textContent = "";
+  const explainFor = (a) => {
+    if (a.type === "isa") return (a.allocation && (a.allocation.equities || 0) > 0)
+      ? "A stocks & shares ISA: investments inside a tax-free wrapper. No tax on growth, dividends or withdrawals — ever. This is usually the first home for long-term savings after the pension."
+      : "A cash ISA: savings interest inside the tax-free wrapper. Safe in nominal terms, but over long periods cash tends to lose buying power to inflation — see the notes below.";
+    if (a.type === "gia") return "A general investment account: the same investments as an ISA but with no tax wrapper — dividends use the £" + TAX.dividends.allowance + " allowance then get taxed, and gains above the £" + TAX.capitalGains.annualExemptAmount.toLocaleString() + " annual exemption face capital gains tax when sold. Sensible once ISA allowances are full.";
+    return "Everyday cash savings: the household's buffer. Interest counts against the personal savings allowance; anything above it is taxable.";
+  };
+  for (const a of invs) {
+    const kind = a.type === "isa" ? ((a.allocation && a.allocation.equities) ? "Stocks & shares ISA" : "Cash ISA")
+      : a.type === "gia" ? "General investment account" : "Cash savings";
+    cards.append(assetDetailCard(a, d, kind, explainFor(a)));
+  }
+  if (!invs.length) cards.append(el("div", { class: "card" }, el("p", { class: "cardnote" }, "No savings or investments captured yet.")));
+
+  const ed = $("#inv-education"); ed.textContent = "";
+  ed.append(el("h2", null, "Understanding your savings & investments"));
+  const infl10 = Math.round(10000 / Math.pow(1 + d.assumptions.inflation, 10));
+  eduBlock(ed, "The wrapper matters as much as the investment",
+    `The same fund held in an ISA, a GIA or a pension produces very different after-tax results. Each adult can put ${fmtGBP(TAX.isa.annualAllowance)} a year into ISAs where growth and withdrawals are completely tax-free. This household currently uses ${fmtGBP(isaContrib)} of its ${fmtGBP(TAX.isa.annualAllowance * adults)} combined allowance — surplus cash in this plan is automatically swept into ISAs first for exactly this reason.`,
+    "Announced change: from April 2027 the cash-ISA portion of the allowance is capped at £12,000 for under-65s (stocks & shares unaffected).");
+  eduBlock(ed, "Cash: essential, then expensive",
+    `Cash is for the emergency fund (target here: ${fmtGBP(d.assumptions.cashBufferTarget || 0)}) and known near-term spending — money you cannot afford to see fall. Beyond that it quietly shrinks: at ${fmtPct(d.assumptions.inflation)} inflation, £10,000 in cash buys only about ${fmtGBP(infl10)} of today's goods in ten years. Interest is also taxable above the personal savings allowance (£${TAX.savings.personalSavingsAllowance.basic.toLocaleString()} basic rate, £${TAX.savings.personalSavingsAllowance.higher} higher rate, nil at additional rate), and from April 2027 savings interest is taxed at dedicated rates of 22/42/47%.`);
+  eduBlock(ed, "Risk and reward, honestly",
+    "Equities are volatile — falls of 15–20% happen regularly and 30%+ occasionally — but over decades they have out-grown bonds, cash and inflation. Bonds smooth the journey at the cost of growth. The practical question is not “what might it fall by?” but “when do I need this money?”: anything needed within ~5 years generally doesn't belong in equities; money for 15+ years generally does.");
+  eduBlock(ed, "Fees compound just like returns",
+    "A 1% annual fee doesn't sound like much, but it removes roughly 1% of the whole pot every year, forever — the per-account fee-drag figures above translate that into pounds. Below ~0.4% all-in is achievable for simple index portfolios; paying more needs a reason.");
+  eduBlock(ed, "Dividends & gains outside wrappers",
+    `In the GIA, dividends above £${TAX.dividends.allowance} are taxed at ${fmtPct(TAX.dividends.rates.basic)}/${fmtPct(TAX.dividends.rates.higher)}/${fmtPct(TAX.dividends.rates.additional)} by band, and profits when you sell use the £${TAX.capitalGains.annualExemptAmount.toLocaleString()} CGT exemption then face ${fmtPct(TAX.capitalGains.rates.basic)}/${fmtPct(TAX.capitalGains.rates.higher)}. This plan uses those rules automatically when the GIA funds spending — another reason ISA and pension wrappers come first.`);
+  ed.append(el("p", { class: "cardnote", style: "margin-top:14px" },
+    "This page is education, not advice: it explains what you own and how the rules apply, using this plan's assumptions. Fund selection and transfers may need regulated financial advice."));
 }
 
 /* ═══════════════════════════ businesses owned ═══════════════════════════ */
@@ -3392,6 +3650,8 @@ function renderAll() {
   renderWhatIf();
   renderAssumptions();
   renderAssetsTab();
+  renderPensions();
+  renderInvestments();
   renderBusinesses();
   renderDebts();
   renderSDLT();
