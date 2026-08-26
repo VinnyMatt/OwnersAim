@@ -63,6 +63,13 @@
     "hicbcThreshold": 60000,
     "hicbcUpper": 80000
   },
+  "corporationTax": {
+    "smallProfitsRate": 0.19,
+    "mainRate": 0.25,
+    "smallProfitsLimit": 50000,
+    "mainLimit": 250000,
+    "_note": "Marginal relief between the limits is not modelled; the engine applies the small profits rate up to £50k and the main rate above."
+  },
   "stampDuty": {
     "_note": "England & NI SDLT, slice basis. Bands are [upperLimit, rate]; null = no upper limit. Scotland (LBTT) and Wales (LTT) not covered.",
     "residentialBands": [[125000, 0], [250000, 0.02], [925000, 0.05], [1500000, 0.10], [null, 0.12]],

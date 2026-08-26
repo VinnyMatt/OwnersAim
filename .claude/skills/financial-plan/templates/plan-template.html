@@ -782,6 +782,28 @@ const EVENT_TEMPLATES = {
     ],
     describe: (p, d) => `${fmtGBP((p.monthly || 0) * 12)}/yr extra off ${liabilityName(d, p.liabilityId)}`,
   },
+  buyToLet: {
+    name: "Buy-to-let purchase", group: "Property & purchases",
+    desc: "Rental property bought personally (sole or joint) or via a limited company — rent, tax, mortgage and an optional later sale all modelled.",
+    fields: [
+      { key: "name2", label: "Label", type: "text", def: "Buy-to-let" },
+      { key: "year", label: "Purchase year", type: "year" },
+      { key: "price", label: "Price", type: "number", def: 250000 },
+      { key: "deposit", label: "Deposit (from savings)", type: "number", def: 62500 },
+      { key: "otherCosts", label: "Stamp duty & costs (see Stamp duty tab)", type: "number", def: 15000 },
+      { key: "rentMonthly", label: "Rent £/month (today's)", type: "number", def: 1200 },
+      { key: "lettingCostsPct", label: "Letting costs % of rent", type: "pct", def: 15 },
+      { key: "owner", label: "Purchased by", type: "btlOwner" },
+      { key: "mortType", label: "Mortgage", type: "select", options: ["interest-only", "repayment", "none"], def: "interest-only" },
+      { key: "rate", label: "Mortgage rate %", type: "pct", def: 5 },
+      { key: "termYears", label: "Term years (repayment only)", type: "number", def: 20 },
+      { key: "growth", label: "Property growth %/yr", type: "pct", def: 3 },
+      { key: "payoutPct", label: "Company only: % of profit paid out", type: "pct", def: 100 },
+      { key: "divTo", label: "Company only: profits paid to", type: "btlDivTo" },
+      { key: "sellYear", label: "Sell in plan year (0 = keep)", type: "number", def: 0 },
+    ],
+    describe: (p, d) => `${p.name2 || "BTL"}: ${fmtGBP(p.price)}${p.owner === "company" ? " via Ltd" : p.owner === "joint" ? " in joint names" : " — " + personName(d, p.owner)}, rent ${fmtGBP((p.rentMonthly || 0) * 12)}/yr${p.sellYear > 0 ? ", sold in year " + p.sellYear : ""}`,
+  },
   buyProperty: {
     name: "Buy a property", group: "Property & purchases",
     desc: "New property with a deposit taken from savings and an optional mortgage.",
@@ -929,6 +951,7 @@ function compileEvents(d, events) {
     extraIncome: [],                      // {name, yearFrom, yearTo, annualToday, taxable, ownerId}
     debtOverpay: [],                      // {liabilityId, fromYear, annual}
     sellBusiness: [],                     // {bizId, yearIdx, price, badr}
+    btl: [],                              // buy-to-let configs (see buyToLet template)
   };
   const yearOfAge = (personId, age) => {
     const p = d.people.find((x) => x.id === personId);
@@ -960,6 +983,10 @@ function compileEvents(d, events) {
         m.extraPension.push({ assetId: p.assetId, yearFrom: yearOfAge(owner, p.fromAge), yearTo: yearOfAge(owner, p.toAge), annualToday: p.annual });
         break;
       }
+      case "buyToLet":
+        m.btl.push({ ...p, id: ev.id });
+        m.lumps.push({ yearIdx: p.year, amount: -((p.deposit || 0) + (p.otherCosts || 0)), name: (p.name2 || "Buy-to-let") + " purchase" });
+        break;
       case "buyProperty":
         m.newAssets.push({
           yearIdx: p.year,
@@ -1028,6 +1055,7 @@ function runProjection(d, events) {
   }
   const liabs = (d.liabilities || []).map((l) => ({ ...l, bal: l.balance }));
   const alive = {}; d.people.forEach((p) => (alive[p.id] = true));
+  const btlState = {}; // buy-to-let lifecycle per event id
   const retAge = (p) => mods.retirementAge[p.id] != null ? mods.retirementAge[p.id] : p.retirementAge;
   const spTL = (i) => Math.max(0.025, inflationFor(i), wageGrowthFor(i)); // triple-lock proxy
 
@@ -1068,7 +1096,7 @@ function runProjection(d, events) {
     }
 
     // ── businesses: mark valuation to the growth model; handle sales ──
-    let bizSaleCGT = 0;
+    let bizSaleCGT = 0, corpTax = 0, btlCGT = 0;
     const bizRow = {}, lumpNamesExtra = [];
     for (const b of d.businesses || []) {
       const a = assets.find((x) => x.bizId === b.id);
@@ -1098,6 +1126,31 @@ function runProjection(d, events) {
       }
     }
 
+    // ── buy-to-let purchases (personal → asset + household mortgage; company → share-value asset with internal mortgage) ──
+    for (const cfg of mods.btl) {
+      if (btlState[cfg.id] || i !== cfg.year) continue;
+      const st = btlState[cfg.id] = {
+        mode: cfg.owner === "company" ? "company" : "personal",
+        propVal: cfg.price,
+        mortBal: cfg.mortType === "none" ? 0 : Math.max(0, cfg.price - (cfg.deposit || 0)),
+        retained: 0, sold: false,
+      };
+      if (st.mode === "personal") {
+        const a = { id: "evt-btl-" + cfg.id, ownerId: cfg.owner, type: "property", name: cfg.name2 || "Buy-to-let", value: cfg.price, growthRate: (cfg.growth || 0) / 100, bal: cfg.price, basis: 0 };
+        assets.push(a); st.assetRef = a;
+        if (st.mortBal > 0) {
+          const l = { id: "evt-btlm-" + cfg.id, name: (cfg.name2 || "Buy-to-let") + " mortgage", type: "mortgage",
+            balance: st.mortBal, bal: st.mortBal, interestRate: (cfg.rate || 0) / 100,
+            interestOnly: cfg.mortType === "interest-only",
+            annualPayment: cfg.mortType === "repayment" ? annuityPayment(st.mortBal, (cfg.rate || 0) / 100, cfg.termYears || 20) : 0 };
+          liabs.push(l); st.liabRef = l;
+        }
+      } else {
+        const a = { id: "evt-btl-" + cfg.id, ownerId: "joint", type: "business", name: (cfg.name2 || "Buy-to-let") + " Ltd", value: 0, bal: cfg.deposit || 0, basis: 0, isBtlCompany: true };
+        assets.push(a); st.assetRef = a;
+      }
+    }
+
     // ── offset mortgages: linked cash offsets debt interest instead of earning interest ──
     const assetOffset = {}, liabOffset = {};
     for (const l of liabs) {
@@ -1118,7 +1171,7 @@ function runProjection(d, events) {
     const perPerson = {};
     const incomeItems = []; // {name, ownerId, amount, kind, slot}
     for (const p of d.people) {
-      perPerson[p.id] = { nonSavings: 0, savings: 0, dividends: 0, employmentForNI: 0, seProfitsForNI: 0, reliefDeduction: 0, gross: 0, items: [] };
+      perPerson[p.id] = { nonSavings: 0, savings: 0, dividends: 0, employmentForNI: 0, seProfitsForNI: 0, reliefDeduction: 0, taxCredit: 0, gross: 0, items: [] };
     }
     const personAlive = (pid) => alive[pid];
 
@@ -1196,6 +1249,70 @@ function runProjection(d, events) {
       incomeItems.push({ name: b.name + " — dividends", ownerId: b.ownerId, amount, kind: "dividend" });
     }
 
+    // buy-to-let rent, running costs, interest, corporation tax & company sale
+    for (const cfg of mods.btl) {
+      const st = btlState[cfg.id];
+      if (!st || st.sold || i < cfg.year) continue;
+      const label = cfg.name2 || "Buy-to-let";
+      const selling = cfg.sellYear > cfg.year && i === cfg.sellYear;
+
+      if (st.mode === "company") {
+        const CT = TAX.corporationTax, rateM = (cfg.rate || 0) / 100;
+        if (selling) {
+          // company sale: CT on the gain, then everything distributed as dividends (wind-up simplification)
+          const gain = Math.max(0, st.propVal - cfg.price);
+          const ct = gain * (gain <= CT.smallProfitsLimit ? CT.smallProfitsRate : CT.mainRate);
+          corpTax += ct;
+          const cash = Math.max(0, st.propVal - st.mortBal - ct) + st.retained;
+          for (const [pid, share] of btlDivRecipients(d, cfg, alive)) {
+            const pp = perPerson[pid];
+            pp.gross += cash * share; pp.dividends += cash * share;
+            pp.items.push({ name: label + " Ltd — wind-up distribution", amount: cash * share, type: "dividend" });
+          }
+          incomeItems.push({ name: label + " Ltd — sale distribution", ownerId: "joint", amount: cash, kind: "dividend" });
+          lumpNamesExtra.push("Sale of " + label);
+          st.sold = true; st.assetRef.bal = 0; st.assetRef.sold = true;
+          continue;
+        }
+        const rent = (cfg.rentMonthly || 0) * 12 * infl;
+        const opProfit = rent * (1 - (cfg.lettingCostsPct || 0) / 100);
+        const interest = st.mortBal * rateM;
+        let principal = 0;
+        if (cfg.mortType === "repayment" && st.mortBal > 0) {
+          const pay = Math.min(st.mortBal + interest, annuityPayment(Math.max(0, cfg.price - (cfg.deposit || 0)), rateM, cfg.termYears || 20));
+          principal = Math.max(0, pay - interest);
+        }
+        const profitBeforeCT = Math.max(0, opProfit - interest);
+        const ct = profitBeforeCT * (profitBeforeCT <= CT.smallProfitsLimit ? CT.smallProfitsRate : CT.mainRate);
+        corpTax += ct;
+        const distributable = Math.max(0, opProfit - interest - ct - principal);
+        const payout = distributable * clamp((cfg.payoutPct != null ? cfg.payoutPct : 100) / 100, 0, 1);
+        st.retained += distributable - payout;
+        st.mortBal = Math.max(0, st.mortBal - principal);
+        if (payout > 0.5) {
+          for (const [pid, share] of btlDivRecipients(d, cfg, alive)) {
+            const pp = perPerson[pid];
+            pp.gross += payout * share; pp.dividends += payout * share;
+            pp.items.push({ name: label + " Ltd dividends", amount: payout * share, type: "dividend" });
+          }
+          incomeItems.push({ name: label + " Ltd — dividends", ownerId: "joint", amount: payout, kind: "dividend" });
+        }
+      } else {
+        if (selling) continue; // personal sale handled after tax (CGT needs the band); no rent in the sale year
+        const rent = (cfg.rentMonthly || 0) * 12 * infl;
+        const opProfit = rent * (1 - (cfg.lettingCostsPct || 0) / 100);
+        const interest = (st.liabRef ? Math.max(0, st.liabRef.bal) : 0) * ((cfg.rate || 0) / 100);
+        for (const [pid, share] of btlOwners(d, cfg, alive)) {
+          const pp = perPerson[pid];
+          pp.gross += opProfit * share;
+          pp.nonSavings += opProfit * share;   // Section 24: mortgage interest is NOT deducted…
+          pp.taxCredit = (pp.taxCredit || 0) + TAX.incomeTax.bands[0].rate * Math.min(interest, Math.max(0, opProfit)) * share; // …instead a basic-rate credit applies
+          pp.items.push({ name: label + " rent (net of costs)", amount: opProfit * share, type: "rental" });
+        }
+        incomeItems.push({ name: label + " — rent (net of costs)", ownerId: cfg.owner, amount: opProfit, kind: "rental" });
+      }
+    }
+
     // event extra income
     for (const xi of mods.extraIncome) if (i >= xi.yearFrom && i <= xi.yearTo) {
       const amount = xi.annualToday * infl;
@@ -1252,9 +1369,35 @@ function runProjection(d, events) {
       const pp = perPerson[p.id];
       if (!alive[p.id]) { pp.tax = { incomeTax: 0, dividendTax: 0, ni: 0, total: 0, personalAllowance: 0, ani: 0, band: "basic", bandBreak: { basic: 0, higher: 0, additional: 0 } }; continue; }
       pp.tax = taxCore(pp);
+      if (pp.taxCredit > 0) {   // e.g. Section 24 basic-rate relief on BTL mortgage interest
+        const credit = Math.min(pp.taxCredit, pp.tax.incomeTax);
+        pp.tax.incomeTax -= credit; pp.tax.total -= credit;
+      }
       taxTotal += pp.tax.incomeTax + pp.tax.dividendTax + pp.tax.ni;
     }
-    taxTotal += bizSaleCGT;
+    taxTotal += bizSaleCGT + corpTax;
+
+    // personal buy-to-let sales (after tax so the CGT band is known)
+    for (const cfg of mods.btl) {
+      const st = btlState[cfg.id];
+      if (!st || st.sold || st.mode !== "personal" || !(cfg.sellYear > cfg.year) || i !== cfg.sellYear) continue;
+      const a = st.assetRef, l = st.liabRef;
+      const value = a.bal;
+      const gain = Math.max(0, value - cfg.price);
+      let cgt = 0;
+      for (const [pid, share] of btlOwners(d, cfg, alive)) {
+        const pp = perPerson[pid];
+        const taxable = Math.max(0, gain * share - TAX.capitalGains.annualExemptAmount);
+        const rate = pp.tax.band !== "basic" ? TAX.capitalGains.rates.higher : TAX.capitalGains.rates.basic;
+        cgt += taxable * rate;
+      }
+      btlCGT += cgt; taxTotal += cgt;
+      saleProceeds.push(value - (l ? Math.max(0, l.bal) : 0) - cgt);
+      lumpNamesExtra.push("Sale of " + (cfg.name2 || "buy-to-let"));
+      a.bal = 0; a.sold = true;
+      if (l) l.bal = 0;
+      st.sold = true;
+    }
 
     // HICBC — child benefit for children under 18, charged on higher-ANI person
     let childBenefit = 0, hicbc = 0;
@@ -1292,15 +1435,23 @@ function runProjection(d, events) {
       const interest = Math.max(0, l.bal - (liabOffset[l.id] || 0)) * (l.interestRate || 0);
       let overpay = 0;
       for (const op of mods.debtOverpay) if (op.liabilityId === l.id && i >= op.fromYear) overpay += op.annual;
-      const pay = Math.min(l.bal + interest, (l.annualPayment || 0) + overpay);
+      const basePay = l.interestOnly ? interest : (l.annualPayment || 0);
+      const pay = Math.min(l.bal + interest, basePay + overpay);
       l.bal = Math.max(0, l.bal + interest - pay);
       debtPay += pay; debtInterest += interest;
     }
 
     // ── asset growth (non-cash growth; cash interest added here too; offset cash earns nothing on the offset slice) ──
     for (const a of assets) {
-      if (a.bal <= 0 || a.isBusiness) continue;
+      if (a.bal <= 0 || a.isBusiness || a.isBtlCompany) continue;
       a.bal += Math.max(0, a.bal - (assetOffset[a.id] || 0)) * assetGrowthFor(a, i);
+    }
+    // BTL company share value = property + retained cash − internal mortgage
+    for (const cfg of mods.btl) {
+      const st = btlState[cfg.id];
+      if (!st || st.mode !== "company" || st.sold) continue;
+      st.propVal *= 1 + (cfg.growth || 0) / 100;
+      st.assetRef.bal = Math.max(0, st.propVal - st.mortBal) + st.retained;
     }
 
     // ── planned contributions into non-pension assets ──
@@ -1440,7 +1591,7 @@ function runProjection(d, events) {
       ages: Object.fromEntries(d.people.map((p) => [p.id, ageIn(p, i)])),
       alive: { ...alive },
       perPerson: deepCopy(perPerson),
-      grossIncome, childBenefit, hicbc, taxTotal, withdrawalTax, cgtPaid: cgtPaid + bizSaleCGT, bizSaleCGT,
+      grossIncome, childBenefit, hicbc, taxTotal, withdrawalTax, cgtPaid: cgtPaid + bizSaleCGT + btlCGT, bizSaleCGT, corpTax,
       businesses: bizRow,
       netIncome: grossIncome + untaxedExtra + childBenefit - taxTotal,
       spendTotal, spendItems, debtPay, debtInterest,
@@ -1452,6 +1603,15 @@ function runProjection(d, events) {
     });
   }
   return rows;
+}
+
+function btlOwners(d, cfg, alive) {
+  if (cfg.owner === "joint" || !alive[cfg.owner]) return shareOwners(d, "joint", alive);
+  return [[cfg.owner, 1]];
+}
+function btlDivRecipients(d, cfg, alive) {
+  if (cfg.divTo && cfg.divTo !== "both" && alive[cfg.divTo]) return [[cfg.divTo, 1]];
+  return shareOwners(d, "joint", alive);
 }
 
 function shareOwners(d, ownerId, alive) {
@@ -2062,6 +2222,7 @@ function openYearDrawer(i) {
   }
   if (r.hicbc > 0.5) taxRows.push(["Child benefit charge", fmtGBP(r.hicbc)]);
   if (r.cgtPaid > 0.5) taxRows.push(["Capital gains tax", fmtGBP(r.cgtPaid)]);
+  if (r.corpTax > 0.5) taxRows.push(["Corporation tax (property company)", fmtGBP(r.corpTax)]);
   if (r.withdrawalTax > 0.5) taxRows.push(["Tax on pension withdrawals", fmtGBP(r.withdrawalTax)]);
   section("Tax", taxRows, "Total tax", fmtGBP(r.taxTotal));
 
@@ -2190,6 +2351,17 @@ function openEventForm(templateKey, existing) {
       inp = el("select");
       d.incomes.forEach((x) => inp.append(el("option", { value: x.id }, x.name)));
       if (cur) inp.value = cur;
+    } else if (f.type === "btlOwner") {
+      inp = el("select");
+      d.people.forEach((p2) => inp.append(el("option", { value: p2.id }, p2.name)));
+      if (d.people.length > 1) inp.append(el("option", { value: "joint" }, "Joint names"));
+      inp.append(el("option", { value: "company" }, "Limited company"));
+      if (cur) inp.value = cur;
+    } else if (f.type === "btlDivTo") {
+      inp = el("select");
+      d.people.forEach((p2) => inp.append(el("option", { value: p2.id }, p2.name)));
+      if (d.people.length > 1) inp.append(el("option", { value: "both" }, "Both equally"));
+      inp.value = cur != null ? cur : (d.people.length > 1 ? "both" : d.people[0].id);
     } else if (f.type === "business") {
       inp = el("select");
       (d.businesses || []).forEach((b) => inp.append(el("option", { value: b.id }, b.name)));
@@ -2228,7 +2400,7 @@ function openEventForm(templateKey, existing) {
   save.addEventListener("click", () => {
     const p = {};
     for (const [key, { inp, f }] of Object.entries(inputs)) {
-      if (f.type === "text" || f.type === "select" || f.type === "person" || f.type === "income" || f.type === "liability" || f.type === "business" || (f.type || "").startsWith("asset")) p[key] = inp.value;
+      if (f.type === "text" || f.type === "select" || f.type === "person" || f.type === "income" || f.type === "liability" || f.type === "business" || f.type === "btlOwner" || f.type === "btlDivTo" || (f.type || "").startsWith("asset")) p[key] = inp.value;
       else p[key] = parseFloat(inp.value) || 0;
     }
     if (existing) { existing.params = p; existing.name = nameField.value || tmpl.name; existing.template = templateKey; }

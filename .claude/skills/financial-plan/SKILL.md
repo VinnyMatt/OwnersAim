@@ -95,6 +95,14 @@ the PDF report. Rebuild only when the underlying facts or tax rules change.
 - Shortfalls are funded in the assumptions' withdrawal order; surpluses top up the cash
   buffer then fill ISA (respecting the annual allowance) then GIA.
 - HICBC is charged on the higher earner while any child is under 18.
+- Buy-to-let what-ifs: rent grows with inflation; personal ownership taxes rental profit
+  as non-savings income with the Section 24 basic-rate credit on mortgage interest (no
+  deduction); a sale applies CGT (18/24 after the AEA per owner). Company ownership pays
+  corporation tax (19% to £50k, 25% above — no marginal relief), pays the chosen % of
+  net profit as dividends, retains the rest inside the company's share value, and a sale
+  pays CT on the gain then distributes everything as dividends (wind-up simplification;
+  no BADR on property companies). Company mortgages live inside the company, not the
+  household Debts tab.
 - The Inheritance tax tab shows year-by-year exposure (spouse exemption + transferable
   NRB/RNRB with taper, pensions in the estate from April 2027); it does NOT deduct IHT
   inside the projection on a death what-if, and gifts/trusts/BPR are not modelled.
