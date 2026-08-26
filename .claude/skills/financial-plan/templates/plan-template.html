@@ -329,6 +329,7 @@ footer.privacy {
   <button data-tab="overview">Overview</button>
   <button data-tab="tax">Tax</button>
   <button data-tab="networth">Net worth</button>
+  <button data-tab="assets">Assets</button>
   <button data-tab="business">Businesses owned</button>
   <button data-tab="debts">Debts</button>
   <button data-tab="cashflow">Cash flow</button>
@@ -370,6 +371,19 @@ footer.privacy {
     <div class="card">
       <h3>Balances by year</h3>
       <div class="tablewrap" id="nw-table"></div>
+    </div>
+  </section>
+
+  <section class="tabpane" id="pane-assets">
+    <div class="card">
+      <h2>Assets, one at a time</h2>
+      <p class="cardnote">Pick any asset — including ones created by what-if events — and see exactly how it grows and reduces each year: growth and money added, withdrawals and sales out, and the closing balance.</p>
+      <div class="controls" id="asset-controls"></div>
+      <div class="chartbox" id="asset-chart"></div>
+    </div>
+    <div class="card">
+      <h3 id="asset-table-title">Year by year</h3>
+      <div class="tablewrap" id="asset-table"></div>
     </div>
   </section>
 
@@ -809,7 +823,7 @@ const EVENT_TEMPLATES = {
       { key: "growth", label: "Property growth %/yr", type: "pct", def: 3 },
       { key: "payoutPct", label: "Company only: % of profit paid out", type: "pct", def: 100 },
       { key: "divTo", label: "Company only: profits paid to", type: "btlDivTo" },
-      { key: "sellYear", label: "Sell in plan year (0 = keep)", type: "number", def: 0 },
+      { key: "sellYear", label: "Sell in year (e.g. 2060, or plan year; 0 = keep)", type: "number", def: 0 },
     ],
     describe: (p, d) => `${p.name2 || "BTL"}: ${fmtGBP(p.price)}${p.owner === "company" ? " via Ltd" : p.owner === "joint" ? " in joint names" : " — " + personName(d, p.owner)}, rent ${fmtGBP((p.rentMonthly || 0) * 12)}/yr${p.sellYear > 0 ? ", sold in year " + p.sellYear : ""}`,
   },
@@ -992,10 +1006,13 @@ function compileEvents(d, events) {
         m.extraPension.push({ assetId: p.assetId, yearFrom: yearOfAge(owner, p.fromAge), yearTo: yearOfAge(owner, p.toAge), annualToday: p.annual });
         break;
       }
-      case "buyToLet":
-        m.btl.push({ ...p, id: ev.id });
+      case "buyToLet": {
+        // accept a calendar year (e.g. 2060) or a plan-year index in sellYear
+        const sellIdx = p.sellYear > 1000 ? p.sellYear - startYear : p.sellYear;
+        m.btl.push({ ...p, sellYear: sellIdx, id: ev.id });
         m.lumps.push({ yearIdx: p.year, amount: -((p.deposit || 0) + (p.otherCosts || 0)), name: (p.name2 || "Buy-to-let") + " purchase" });
         break;
+      }
       case "buyProperty":
         m.newAssets.push({
           yearIdx: p.year,
@@ -1074,6 +1091,9 @@ function runProjection(d, events) {
     const wage = cumFactor(wageGrowthFor, i);
     const spFactor = (() => { let f = 1; for (let y = 1; y <= i; y++) f *= 1 + spTL(y); return f; })();
 
+    const assetOut = {}; // money leaving each asset this year (withdrawals + sales) — feeds the Assets tab
+    const takeFrom = (id, amt) => { if (amt > 0.5) assetOut[id] = (assetOut[id] || 0) + amt; };
+
     // deaths this year
     for (const [pid, dy] of Object.entries(mods.deathYear)) {
       if (dy === i && alive[pid]) {
@@ -1092,6 +1112,7 @@ function runProjection(d, events) {
     for (const s of mods.sellAsset) if (s.yearIdx === i) {
       const a = assets.find((x) => x.id === s.assetId && x.bal > 0);
       if (a) {
+        takeFrom(a.id, a.bal);
         let proceeds = a.bal - (s.costs || 0);
         const lk = liabs.find((l) => l.linkedAssetId === a.id && l.bal > 0);
         if (lk) { proceeds -= lk.bal; lk.bal = 0; }
@@ -1124,6 +1145,7 @@ function runProjection(d, events) {
         bizSaleCGT += cgt;
         saleProceeds.push(proceeds - cgt);
         lumpNamesExtra.push("Sale of " + b.name);
+        takeFrom(a.id, a.bal);
         a.sold = true; a.bal = 0;
         bizRow[b.id] = { ...m2, valuation: 0, soldThisYear: true, proceeds, cgt };
       } else if (a.sold) {
@@ -1281,6 +1303,7 @@ function runProjection(d, events) {
           }
           incomeItems.push({ name: label + " Ltd — sale distribution", ownerId: "joint", amount: cash, kind: "dividend" });
           lumpNamesExtra.push("Sale of " + label);
+          takeFrom(st.assetRef.id, st.assetRef.bal);
           st.sold = true; st.assetRef.bal = 0; st.assetRef.sold = true;
           continue;
         }
@@ -1404,6 +1427,7 @@ function runProjection(d, events) {
       btlCGT += cgt; taxTotal += cgt;
       saleProceeds.push(value - (l ? Math.max(0, l.bal) : 0) - cgt);
       lumpNamesExtra.push("Sale of " + (cfg.name2 || "buy-to-let"));
+      takeFrom(a.id, value);
       a.bal = 0; a.sold = true;
       if (l) l.bal = 0;
       st.sold = true;
@@ -1529,9 +1553,11 @@ function runProjection(d, events) {
               pp.tax = taxCore(pp);
               withdrawalTax += tax2; taxTotal += tax2;
               a.bal -= gross; need -= gross - tax2;
+              takeFrom(a.id, gross);
               withdrawals.push({ name: a.name, amount: gross, type: typ });
             } else {
               a.bal -= gross; need -= gross * (1 - (1 - tf) * marg);
+              takeFrom(a.id, gross);
               withdrawals.push({ name: a.name, amount: gross, type: typ });
             }
           } else if (typ === "gia") {
@@ -1549,12 +1575,14 @@ function runProjection(d, events) {
             a.basis = Math.max(0, a.basis * (1 - w / Math.max(a.bal, 1)));
             a.bal -= w; need -= w - cgt;
             cgtPaid += cgt; taxTotal += cgt;
+            takeFrom(a.id, w);
             withdrawals.push({ name: a.name, amount: w, type: typ });
           } else {
             const floor = typ === "cash" ? 0 : 0;
             const avail = Math.max(0, a.bal - floor);
             const w = Math.min(avail, need);
             a.bal -= w; need -= w;
+            takeFrom(a.id, w);
             if (w > 0) withdrawals.push({ name: a.name, amount: w, type: typ });
           }
         }
@@ -1608,7 +1636,7 @@ function runProjection(d, events) {
       pensionContribTotal, employerContribTotal, plannedSavings,
       incomeItems, withdrawals, lumpIn, lumpOut, lumpNames: [...cbLumpNames],
       shortfall, surplusSaved: surplusTotal,
-      assets: assetBals, assetTotal, liabs: liabBals, liabTotal, offsets: liabOffset, netWorth: assetTotal - liabTotal,
+      assets: assetBals, assetOut, assetTotal, liabs: liabBals, liabTotal, offsets: liabOffset, netWorth: assetTotal - liabTotal,
       inflFactor: infl,
     });
   }
@@ -1937,8 +1965,23 @@ function assetSeries(rows) {
       const b = (d.businesses || []).find((x) => "biz-" + x.id === id);
       a = { id, name: b ? b.name : "Business", type: "business" };
     }
+    if (!a && id.startsWith("evt-")) {
+      const ev = (d.events || []).find((e2) => id === "evt-btl-" + e2.id || id === "evt-prop-" + e2.id);
+      if (ev) {
+        const isCompanyBtl = id.startsWith("evt-btl-") && ev.params && ev.params.owner === "company";
+        a = { id, name: ((ev.params && ev.params.name2) || ev.name) + (isCompanyBtl ? " Ltd" : ""), type: isCompanyBtl ? "business" : "property" };
+      }
+    }
+    if (!a && id.endsWith("-next")) {
+      const base = d.assets.find((x) => x.id + "-next" === id);
+      if (base) a = { id, name: "New home (after " + base.name + ")", type: "property" };
+    }
     a = a || { id, name: id.startsWith("evt-") ? "What-if asset" : id, type: "other" };
-    meta.push({ id, name: a.name, type: a.type || "other", slot: slotFor(id), shade: (state.assetSlots[id] || {}).shade || 0, opacity: opacityFor(id) });
+    const slotEntry = state.assetSlots[id];
+    meta.push({ id, name: a.name, type: a.type || "other",
+      slot: slotEntry ? slotEntry.slot : slotOf(a),
+      shade: slotEntry ? slotEntry.shade : 0,
+      opacity: slotEntry ? opacityFor(id) : 1 });
   }
   meta.sort((a, b) => a.slot - b.slot || a.shade - b.shade || a.name.localeCompare(b.name));
   return meta.map((m) => ({
@@ -2486,6 +2529,61 @@ function renderAssumptions() {
     tb.append(tr);
   });
   tbl.append(tb); wrap.append(tbl);
+}
+
+/* ═══════════════════════════ assets tab ═══════════════════════════ */
+function renderAssetsTab() {
+  const rows = state.proj;
+  const meta = assetSeries(rows);   // includes what-if assets, named & coloured
+  const controls = $("#asset-controls"); controls.textContent = "";
+  if (!meta.length) { $("#asset-chart").textContent = ""; $("#asset-table").textContent = ""; return; }
+
+  if (!meta.some((m) => m.id === state.assetTab)) state.assetTab = meta[0].id;
+  const sel = el("select", { style: "width:auto;min-width:220px" });
+  meta.forEach((m) => sel.append(el("option", { value: m.id }, m.name)));
+  sel.value = state.assetTab;
+  sel.addEventListener("change", () => { state.assetTab = sel.value; renderAssetsTab(); });
+  const f = el("div", { class: "field" }, el("label", null, "Asset")); f.append(sel); controls.append(f);
+
+  const m = meta.find((x) => x.id === state.assetTab);
+  const dAsset = state.data.assets.find((a) => a.id === m.id);
+  $("#asset-table-title").textContent = m.name + " — year by year";
+
+  renderStackedChart($("#asset-chart"), {
+    mode: "bar",
+    series: [{ id: m.id, name: m.name, slot: m.slot, opacity: m.opacity, values: m.values }],
+    labels: rows.map((r) => String(r.year)),
+    height: 280,
+    tooltipTitle: (i) => rows[i].label + " · " + agesLabel(rows[i]),
+    onClickYear: (i) => openYearDrawer(i),
+  });
+
+  const wrap = $("#asset-table"); wrap.textContent = "";
+  const tbl = el("table", { class: "data" });
+  tbl.append(el("thead", null, el("tr", null,
+    ...["Year", "Ages", "Start", "Growth & money in", "Withdrawn / sold", "End balance"].map((h) => el("th", null, h)))));
+  const tb = el("tbody");
+  let everActive = false;
+  rows.forEach((r, i) => {
+    const start = i === 0 ? (dAsset ? dAsset.value : 0) : (rows[i - 1].assets[m.id] || 0);
+    const end = r.assets[m.id] || 0;
+    const out = (r.assetOut || {})[m.id] || 0;
+    const inGrow = end - start + out;
+    if (start < 0.5 && end < 0.5 && out < 0.5) { if (everActive) return; if (i > 0) return; }
+    everActive = everActive || end > 0.5 || out > 0.5;
+    const tr = el("tr", null,
+      el("td", null, r.label),
+      el("td", null, agesLabel(r)),
+      el("td", null, start > 0.5 ? fmtGBP(start) : "—"),
+      el("td", { class: inGrow < -0.5 ? "neg" : "" }, Math.abs(inGrow) > 0.5 ? (inGrow > 0 ? "+" : "−") + fmtGBP(Math.abs(inGrow)) : "—"),
+      el("td", { class: out > 0.5 ? "neg" : "" }, out > 0.5 ? "−" + fmtGBP(out) : "—"),
+      el("td", null, end > 0.5 ? fmtGBP(end) : out > 0.5 ? "sold / emptied" : "—"));
+    tr.addEventListener("click", () => openYearDrawer(i));
+    tb.append(tr);
+  });
+  tbl.append(tb); wrap.append(tbl);
+  wrap.append(el("p", { class: "cardnote", style: "margin-top:10px" },
+    "“Growth & money in” combines investment growth with contributions, surplus savings and transfers in; “Withdrawn / sold” is money taken out to fund spending plus sale values. Rows outside the asset's life are hidden."));
 }
 
 /* ═══════════════════════════ businesses owned ═══════════════════════════ */
@@ -3293,6 +3391,7 @@ function renderAll() {
   renderCashflow();
   renderWhatIf();
   renderAssumptions();
+  renderAssetsTab();
   renderBusinesses();
   renderDebts();
   renderSDLT();
