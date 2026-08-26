@@ -157,7 +157,9 @@
         "valuationBasis": "multiple", "annualTurnover": 400000, "turnoverGrowth": 0.04,
         "profitMargin": 0.18, "valuationMultiple": 4,
         "valuationToday": 0, "growthRate": 0.03,
-        "salaryIncomeId": "salary-client", "dividendIncomeId": "dividends-client"
+        "dividendsDrawn": 20000, "dividendsGrowth": null,
+        "salaryIncomeId": "salary-client", "dividendIncomeId": null,
+        "_dividends_note": "dividendsDrawn adds that much dividend income to the owner directly (today's £; tracks business growth unless dividendsGrowth is set). Use dividendIncomeId ONLY to tag an income entry that already exists in incomes[] — don't use both or the dividends double-count. Growth is overridable year-by-year in assumptions.yearOverrides[i].bizGrowth[bizId]."
       }
     }
   ],

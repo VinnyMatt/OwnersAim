@@ -608,17 +608,45 @@ function assetGrowthFor(asset, i) {
 }
 const cumFactor = (rateFn, uptoIdx) => { let f = 1; for (let i = 1; i <= uptoIdx; i++) f *= 1 + rateFn(i); return f; };
 
-/* business growth model: turnover → profit → valuation (owned share) */
+/* business growth model: turnover → profit → valuation (owned share).
+   The default growth rate can be overridden year-by-year on the Assumptions tab
+   (yearOverrides[i].bizGrowth[bizId]); in multiple mode the override drives
+   turnover growth, in fixed mode it drives the valuation growth. */
+function bizDefaultGrowth(b) {
+  return (b.valuationBasis || "multiple") === "fixed"
+    ? (b.growthRate != null ? b.growthRate : 0.03)
+    : (b.turnoverGrowth != null ? b.turnoverGrowth : 0.03);
+}
+function bizGrowthFor(b, y) {
+  const o = ovr(y);
+  if (o.bizGrowth && o.bizGrowth[b.id] != null) return o.bizGrowth[b.id];
+  return bizDefaultGrowth(b);
+}
 function bizMetrics(b, i) {
-  const turnover = (b.annualTurnover || 0) * Math.pow(1 + (b.turnoverGrowth != null ? b.turnoverGrowth : 0.03), i);
-  const profit = turnover * (b.profitMargin != null ? b.profitMargin : 0.15);
-  let valuation;
-  if (b.valuationBasis === "fixed") {
-    valuation = (b.valuationToday || 0) * Math.pow(1 + (b.growthRate != null ? b.growthRate : 0.03), i);
-  } else {
-    valuation = profit * (b.valuationMultiple != null ? b.valuationMultiple : 4);
+  const basis = b.valuationBasis || "multiple";
+  let tf = 1, vf = 1;
+  for (let y = 1; y <= i; y++) {
+    if (basis === "multiple") {
+      tf *= 1 + bizGrowthFor(b, y);
+    } else {
+      tf *= 1 + (b.turnoverGrowth != null ? b.turnoverGrowth : 0.03);
+      vf *= 1 + bizGrowthFor(b, y);
+    }
   }
+  const turnover = (b.annualTurnover || 0) * tf;
+  const profit = turnover * (b.profitMargin != null ? b.profitMargin : 0.15);
+  const valuation = basis === "fixed"
+    ? (b.valuationToday || 0) * vf
+    : profit * (b.valuationMultiple != null ? b.valuationMultiple : 4);
   return { turnover, profit, valuation: valuation * (b.ownershipPct != null ? b.ownershipPct : 1) };
+}
+/* dividends drawn from the business in year i (today's £ input; tracks the
+   business's turnover path unless a bespoke dividendsGrowth is set) */
+function bizDividends(b, i) {
+  if (!(b.dividendsDrawn > 0)) return 0;
+  if (b.dividendsGrowth != null) return b.dividendsDrawn * Math.pow(1 + b.dividendsGrowth, i);
+  if (!(b.annualTurnover > 0)) return b.dividendsDrawn * Math.pow(1 + bizDefaultGrowth(b), i);
+  return b.dividendsDrawn * (bizMetrics(b, i).turnover / b.annualTurnover);
 }
 
 /* ═══════════════════════════ UK tax engine ═══════════════════════════ */
@@ -1140,6 +1168,23 @@ function runProjection(d, events) {
         pp.items.push({ name: "State Pension", amount, type: "statePension" });
         incomeItems.push({ name: "State Pension (" + p.name.split(" ")[0] + ")", ownerId: p.id, amount, kind: "statePension" });
       }
+    }
+
+    // dividends drawn directly from businesses (taxed as dividend income to the owner)
+    for (const b of d.businesses || []) {
+      const info = bizRow[b.id];
+      if (!info || info.sold || info.soldThisYear) continue;
+      const amount = bizDividends(b, i);
+      if (amount <= 0) continue;
+      if (b.ownerId && b.ownerId !== "joint" && !alive[b.ownerId]) continue;
+      const owners = shareOwners(d, b.ownerId || d.people[0].id, alive);
+      for (const [pid, share] of owners) {
+        const pp = perPerson[pid];
+        pp.gross += amount * share;
+        pp.dividends += amount * share;
+        pp.items.push({ name: b.name + " — dividends", amount: amount * share, type: "dividend" });
+      }
+      incomeItems.push({ name: b.name + " — dividends", ownerId: b.ownerId, amount, kind: "dividend" });
     }
 
     // event extra income
@@ -2212,6 +2257,7 @@ function renderAssumptions() {
   const tbl = el("table", { class: "data" });
   const head = el("tr", null, el("th", null, "Year"), el("th", null, "Inflation %"), el("th", null, "Wage growth %"));
   for (const a of d.assets) head.append(el("th", null, a.name + " %"));
+  for (const b of d.businesses || []) head.append(el("th", null, b.name + " %"));
   tbl.append(el("thead", null, head));
   const tb = el("tbody");
   const yo = d.assumptions.yearOverrides;
@@ -2236,6 +2282,15 @@ function renderAssumptions() {
           if (v == null) delete yo[String(i)].growth[a.id]; else yo[String(i)].growth[a.id] = v;
         },
         ((a.growthRate ?? 0.04) * 100).toFixed(1)));
+    }
+    for (const b of d.businesses || []) {
+      tr.append(cell(
+        () => ((yo[String(i)] || {}).bizGrowth || {})[b.id],
+        (v) => {
+          yo[String(i)].bizGrowth = yo[String(i)].bizGrowth || {};
+          if (v == null) delete yo[String(i)].bizGrowth[b.id]; else yo[String(i)].bizGrowth[b.id] = v;
+        },
+        (bizDefaultGrowth(b) * 100).toFixed(1)));
     }
     tb.append(tr);
   });
@@ -2294,6 +2349,12 @@ function renderBusinesses() {
       controls.append(field("Value growth %/yr", num(() => ((b.growthRate != null ? b.growthRate : 0.03) * 100).toFixed(1), (v) => (b.growthRate = v / 100), 0.5, "90px")));
     }
 
+    controls.append(field("Dividends drawn £/yr", num(() => Math.round(b.dividendsDrawn || 0), (v) => (b.dividendsDrawn = v), 1000)));
+    const dgInp = el("input", { type: "number", step: "0.5", value: b.dividendsGrowth != null ? (b.dividendsGrowth * 100).toFixed(1) : "", placeholder: "tracks business" });
+    dgInp.style.width = "110px";
+    dgInp.addEventListener("change", () => { b.dividendsGrowth = dgInp.value === "" ? null : (parseFloat(dgInp.value) || 0) / 100; recompute(); });
+    controls.append(field("Dividends growth %/yr", dgInp));
+
     const linkSel = (label, cur, onSet, filterType) => {
       const sel = el("select");
       sel.append(el("option", { value: "" }, "None"));
@@ -2302,8 +2363,8 @@ function renderBusinesses() {
       sel.addEventListener("change", () => { onSet(sel.value || null); recompute(); });
       return field(label, sel);
     };
-    controls.append(linkSel("Salary drawn (link)", b.salaryIncomeId, (v) => (b.salaryIncomeId = v), "employment"));
-    controls.append(linkSel("Dividends drawn (link)", b.dividendIncomeId, (v) => (b.dividendIncomeId = v), "dividend"));
+    controls.append(linkSel("Salary drawn (link existing)", b.salaryIncomeId, (v) => (b.salaryIncomeId = v), "employment"));
+    controls.append(linkSel("Or link existing dividends", b.dividendIncomeId, (v) => (b.dividendIncomeId = v), "dividend"));
 
     const del = el("button", { class: "btn small danger" }, "Delete");
     del.addEventListener("click", () => { d.businesses = d.businesses.filter((x) => x !== b); recompute(); });
@@ -2312,7 +2373,9 @@ function renderBusinesses() {
     box.append(controls);
     const m0 = bizMetrics(b, 0);
     box.append(el("p", { class: "cardnote", style: "margin:10px 0 0" },
-      `Today: turnover ${fmtCompact(m0.turnover)}, net profit ${fmtCompact(m0.profit)}, your share valued at ${fmtCompact(m0.valuation)}.`));
+      `Today: turnover ${fmtCompact(m0.turnover)}, net profit ${fmtCompact(m0.profit)}, your share valued at ${fmtCompact(m0.valuation)}` +
+      (b.dividendsDrawn > 0 ? `, drawing ${fmtCompact(b.dividendsDrawn)} in dividends (taxed to the owner)` : "") +
+      `. Bespoke the growth year-by-year in the “${b.name}” column on the Assumptions tab.`));
     editors.append(box);
   }
 
@@ -2355,15 +2418,17 @@ function renderBusinesses() {
       if (m2.sold && !(rows[i - 1] && rows[i - 1].businesses[b.id] && !rows[i - 1].businesses[b.id].sold)) {
         if (i > 0 && rows[i - 1].businesses[b.id] && rows[i - 1].businesses[b.id].sold) return; // collapse post-sale years
       }
-      const sal = linkedAmount(r, b.salaryIncomeId), div2 = linkedAmount(r, b.dividendIncomeId);
+      const sal = linkedAmount(r, b.salaryIncomeId);
+      const direct = r.incomeItems.find((x) => x.name === b.name + " — dividends");
+      const div2 = (linkedAmount(r, b.dividendIncomeId) || 0) + (direct ? direct.amount : 0);
       const tr = el("tr", null,
         el("td", null, r.label),
         el("td", null, agesLabel(r)),
         el("td", null, m2.soldThisYear || m2.sold ? "—" : fmtGBP(m2.turnover || 0)),
         el("td", null, m2.soldThisYear || m2.sold ? "—" : fmtGBP(m2.profit || 0)),
         el("td", null, m2.soldThisYear ? "sold for " + fmtGBP(m2.proceeds) + " (CGT " + fmtGBP(m2.cgt) + ")" : m2.sold ? "sold" : fmtGBP(m2.valuation || 0)),
-        el("td", null, sal == null ? "—" : sal > 0.5 ? fmtGBP(sal) : "—"),
-        el("td", null, div2 == null ? "—" : div2 > 0.5 ? fmtGBP(div2) : "—"));
+        el("td", null, sal != null && sal > 0.5 ? fmtGBP(sal) : "—"),
+        el("td", null, div2 > 0.5 ? fmtGBP(div2) : "—"));
       tr.addEventListener("click", () => openYearDrawer(i));
       tb.append(tr);
     });
