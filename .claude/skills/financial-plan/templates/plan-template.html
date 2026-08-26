@@ -488,6 +488,12 @@ footer.privacy {
       <p class="cardnote">Wage growth applies to employment and self-employment income; inflation drives spending, DB pensions and the State Pension floor. Withdrawal order when spending exceeds income: <span id="as-worder"></span>. Surplus is saved to: cash buffer first, then <span id="as-sorder"></span>.</p>
     </div>
     <div class="card">
+      <h3>How surplus income is used</h3>
+      <p class="cardnote" id="as-surplus-note"></p>
+      <div class="tablewrap" id="as-surplus-plan"></div>
+      <div class="controls" id="as-surplus-actions" style="margin-top:10px;margin-bottom:0"></div>
+    </div>
+    <div class="card">
       <h3>Growth assumptions by asset</h3>
       <p class="cardnote">Every asset class — cash, ISAs, investments, pensions, property — has its own editable rate. The same table appears on the Net worth tab.</p>
       <div class="tablewrap" id="as-growth-table"></div>
@@ -1551,6 +1557,7 @@ function runProjection(d, events) {
 
     // ── withdrawals (deficit) or surplus allocation ──
     let withdrawals = [], withdrawalTax = 0, cgtPaid = 0, shortfall = 0, surplusTotal = 0;
+    const surplusUses = [];
     if (flow < -0.5) {
       let need = -flow;
       const order = d.assumptions.withdrawalOrder || ["cash", "gia", "isa", "pension"];
@@ -1619,30 +1626,62 @@ function runProjection(d, events) {
     } else if (flow > 0.5) {
       let surplus = flow;
       surplusTotal = flow;
-      // top up cash buffer first
-      const buffer = (d.assumptions.cashBufferTarget || 0) * infl;
       const cashAssets = assets.filter((a) => a.type === "cash");
-      if (cashAssets.length) {
-        const totCash = sum(cashAssets.map((a) => a.bal));
-        const top = clamp(buffer - totCash, 0, surplus);
-        if (top > 0) { cashAssets[0].bal += top; surplus -= top; }
-      }
       const adults = d.people.filter((p) => alive[p.id]).length || 1;
       let isaRoom = TAX.isa.annualAllowance * adults;
-      for (const typ of d.assumptions.surplusOrder || ["isa", "gia", "cash"]) {
-        if (surplus <= 0.5) break;
-        // sweep into the best home of this type (highest net-of-fee growth)
-        const pool = assets.filter((a) => a.type === typ && !a.sold && !a.isBusiness && !a.isBtlCompany)
-          .sort((x, y) => netGrowthOf(y) - netGrowthOf(x));
-        if (!pool.length) continue;
-        let put = surplus;
-        if (typ === "isa") put = Math.min(put, isaRoom);
-        if (put <= 0) continue;
-        pool[0].bal += put; if (typ === "gia") pool[0].basis += put;
-        if (typ === "isa") isaRoom -= put;
-        surplus -= put;
+      const plan = d.assumptions.surplusPlan;
+
+      if (plan && plan.length) {
+        // custom percentage split chosen on the Assumptions tab
+        const totalPct = sum(plan.map((r2) => r2.pct || 0));
+        const scale = totalPct > 100 ? 100 / totalPct : 1;
+        for (const rule of plan) {
+          let amt = Math.min(surplus, surplusTotal * ((rule.pct || 0) / 100) * scale);
+          if (amt <= 0.5) continue;
+          const a = assets.find((x) => x.id === rule.target && !x.sold && !x.isBusiness && !x.isBtlCompany);
+          if (a) {
+            if (a.type === "isa") { amt = Math.min(amt, isaRoom); isaRoom -= amt; }
+            if (amt <= 0.5) continue;
+            a.bal += amt; if (a.type === "gia") a.basis += amt;
+            surplus -= amt;
+            surplusUses.push({ name: a.name, amount: amt });
+          } else {
+            const l = liabs.find((x) => x.id === rule.target && x.bal > 0);
+            if (l) {
+              const pay = Math.min(amt, l.bal);
+              l.bal -= pay; surplus -= pay;
+              surplusUses.push({ name: "Paid down " + l.name, amount: pay });
+            }
+          }
+        }
+        if (surplus > 0.5 && cashAssets.length) {
+          cashAssets[0].bal += surplus;
+          surplusUses.push({ name: cashAssets[0].name + " (unallocated remainder)", amount: surplus });
+          surplus = 0;
+        }
+      } else {
+        // automatic: top up the cash buffer, then best ISA (within allowance), then investments
+        const buffer = (d.assumptions.cashBufferTarget || 0) * infl;
+        if (cashAssets.length) {
+          const totCash = sum(cashAssets.map((a) => a.bal));
+          const top = clamp(buffer - totCash, 0, surplus);
+          if (top > 0) { cashAssets[0].bal += top; surplus -= top; }
+        }
+        for (const typ of d.assumptions.surplusOrder || ["isa", "gia", "cash"]) {
+          if (surplus <= 0.5) break;
+          // sweep into the best home of this type (highest net-of-fee growth)
+          const pool = assets.filter((a) => a.type === typ && !a.sold && !a.isBusiness && !a.isBtlCompany)
+            .sort((x, y) => netGrowthOf(y) - netGrowthOf(x));
+          if (!pool.length) continue;
+          let put = surplus;
+          if (typ === "isa") put = Math.min(put, isaRoom);
+          if (put <= 0) continue;
+          pool[0].bal += put; if (typ === "gia") pool[0].basis += put;
+          if (typ === "isa") isaRoom -= put;
+          surplus -= put;
+        }
+        if (surplus > 0.5 && cashAssets.length) { cashAssets[0].bal += surplus; surplus = 0; }
       }
-      if (surplus > 0.5 && cashAssets.length) { cashAssets[0].bal += surplus; surplus = 0; }
       flow = surplus;
     }
 
@@ -1664,7 +1703,7 @@ function runProjection(d, events) {
       spendTotal, spendItems, debtPay, debtInterest,
       pensionContribTotal, employerContribTotal, plannedSavings,
       incomeItems, withdrawals, lumpIn, lumpOut, lumpNames: [...cbLumpNames],
-      shortfall, surplusSaved: surplusTotal,
+      shortfall, surplusSaved: surplusTotal, surplusUses,
       assets: assetBals, assetOut, assetTotal, liabs: liabBals, liabTotal, offsets: liabOffset, netWorth: assetTotal - liabTotal,
       inflFactor: infl,
     });
@@ -2317,7 +2356,9 @@ function openYearDrawer(i) {
      ...(r.debtPay > 0.5 ? [["Debt payments (incl. " + fmtGBP(r.debtInterest) + " interest)", fmtGBP(r.debtPay)]] : []),
      ...(r.pensionContribTotal > 0.5 ? [["Pension contributions (yours)", fmtGBP(r.pensionContribTotal)]] : []),
      ...(r.plannedSavings > 0.5 ? [["Planned saving", fmtGBP(r.plannedSavings)]] : []),
-     ...(r.surplusSaved > 0.5 ? [["Surplus saved", fmtGBP(r.surplusSaved)]] : []),
+     ...(r.surplusUses && r.surplusUses.length
+        ? r.surplusUses.map((u) => ["Surplus → " + u.name, fmtGBP(u.amount)])
+        : r.surplusSaved > 0.5 ? [["Surplus saved", fmtGBP(r.surplusSaved)]] : []),
      ...(r.lumpOut > 0.5 ? [["One-off costs", fmtGBP(r.lumpOut)]] : [])],
     "Total out (excl. tax)", fmtGBP(r.spendTotal + r.debtPay + r.pensionContribTotal + r.plannedSavings + r.surplusSaved + r.lumpOut));
 
@@ -2518,6 +2559,7 @@ function renderAssumptions() {
   $("#as-sorder").textContent = (d.assumptions.surplusOrder || []).map((t) => ASSET_TYPE_LABEL[t] || t).join(" → ");
 
   renderGrowthTable($("#as-growth-table"));
+  renderSurplusPlan();
 
   // per-year override grid
   const wrap = $("#as-overrides"); wrap.textContent = "";
@@ -3493,6 +3535,80 @@ function renderIHT() {
     `${fmtGBP(TAX.inheritanceTax.nilRateBand * mult)} of nil-rate band plus up to ${fmtGBP(TAX.inheritanceTax.residenceNilRateBand * mult)} residence nil-rate band (only against the family home, tapered away by £1 for every £2 the estate exceeds ${fmtGBP(TAX.inheritanceTax.rnrbTaperThreshold)}). The excess is taxed at ${fmtPct(TAX.inheritanceTax.rate)}.`));
   notes.append(el("p", null,
     "Unused pension funds count as part of the estate from 6 April 2027 (as legislated at Autumn Budget 2024/Finance Act) — that is why pensions show as “excluded” only in 2026/27. Lifetime gifting, trusts, business/agricultural relief and life-cover-in-trust are not modelled here: they are exactly the levers that can reduce this number, so a growing red bar is the prompt for an estate-planning conversation, not a fixed liability."));
+}
+
+/* ═══════════════════════════ surplus allocation plan ═══════════════════════════ */
+function renderSurplusPlan() {
+  const d = state.data;
+  const note = $("#as-surplus-note"), wrap = $("#as-surplus-plan"), actions = $("#as-surplus-actions");
+  note.textContent = ""; wrap.textContent = ""; actions.textContent = "";
+  const plan = d.assumptions.surplusPlan;
+
+  const targetOptions = () => {
+    const opts = [];
+    for (const a of d.assets.filter((x) => ["cash", "isa", "gia"].includes(x.type))) opts.push([a.id, a.name]);
+    for (const l of d.liabilities || []) opts.push([l.id, "Pay down — " + l.name]);
+    return opts;
+  };
+
+  if (!plan) {
+    note.textContent = "Currently automatic: surplus tops up the cash buffer first, then fills the best ISA (within the annual allowance), then investments. Create a custom split to direct percentages wherever you choose — including paying down debt.";
+    const btn = el("button", { class: "btn small" }, "Create a custom split");
+    btn.addEventListener("click", () => {
+      const first = targetOptions()[0];
+      d.assumptions.surplusPlan = first ? [{ target: first[0], pct: 100 }] : [];
+      recompute();
+    });
+    actions.append(btn);
+    return;
+  }
+
+  const totalPct = sum(plan.map((r) => r.pct || 0));
+  note.textContent = "Each year's surplus is split by the percentages below. " +
+    (totalPct < 100 ? `The unallocated ${Math.round(100 - totalPct)}% goes to cash.` :
+     totalPct > 100 ? "Percentages above 100% are scaled down proportionally." :
+     "Fully allocated.") +
+    " ISA destinations still respect the annual allowance; pensions are excluded here because personal contributions carry tax relief — model those with the pension's own contribution settings.";
+
+  const tbl = el("table", { class: "data" });
+  tbl.append(el("thead", null, el("tr", null, ...["Destination", "% of surplus", ""].map((h) => el("th", null, h)))));
+  const tb = el("tbody");
+  for (const rule of plan) {
+    const sel2 = el("select");
+    for (const [val, label] of targetOptions()) sel2.append(el("option", { value: val }, label));
+    sel2.value = rule.target;
+    sel2.addEventListener("change", () => { rule.target = sel2.value; recompute(); });
+    const pct = el("input", { type: "number", step: "5", min: "0", max: "100", value: rule.pct != null ? rule.pct : 0 });
+    pct.style.width = "80px";
+    pct.addEventListener("change", () => { rule.pct = clamp(parseFloat(pct.value) || 0, 0, 100); recompute(); });
+    const rm = el("button", { class: "btn small danger" }, "Remove");
+    rm.addEventListener("click", () => { d.assumptions.surplusPlan = plan.filter((x) => x !== rule); recompute(); });
+    tb.append(el("tr", null, el("td", null, sel2), el("td", null, pct), el("td", null, rm)));
+  }
+  tbl.append(tb); wrap.append(tbl);
+
+  const addRule = el("button", { class: "btn small" }, "+ Add destination");
+  addRule.addEventListener("click", () => {
+    const first = targetOptions()[0];
+    if (first) { plan.push({ target: first[0], pct: 0 }); recompute(); }
+  });
+  const mkNew = (label, type, name, growth) => {
+    const b = el("button", { class: "btn small" }, "+ New " + label);
+    b.addEventListener("click", () => {
+      const id = type + "-new-" + Date.now().toString(36);
+      d.assets.push({ id, ownerId: "joint", type, name, value: 0, growthRate: growth, annualContribution: 0, contributionEndAge: null });
+      plan.push({ target: id, pct: 0 });
+      recompute();
+    });
+    return b;
+  };
+  const back = el("button", { class: "btn small danger" }, "Back to automatic");
+  back.addEventListener("click", () => { delete state.data.assumptions.surplusPlan; recompute(); });
+  actions.append(addRule,
+    mkNew("cash account", "cash", "New cash savings", 0.04),
+    mkNew("stocks & shares ISA", "isa", "New S&S ISA", 0.05),
+    mkNew("investment account", "gia", "New investment account (GIA)", 0.05),
+    back);
 }
 
 /* ═══════════════════════════ data view ═══════════════════════════ */
