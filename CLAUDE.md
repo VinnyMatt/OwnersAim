@@ -29,7 +29,7 @@ clients/<name>/client-data.json + plan.html   ← LOCAL ONLY (git-ignored)
 
 `plan-template.html` is a single file by design (privacy: zero network calls except
 Google Fonts, which sends no data and falls back offline). Structure inside it:
-CSS tokens (LifesPlan dark brand; print is forced light) → HTML panes (one per tab)
+CSS tokens (LifesPlan brand on a light scale; print also light) → HTML panes (one per tab)
 → JS: helpers → tax engine (`taxCore`) → what-if templates/compiler → projection
 engine (`runProjection`) → chart library (`renderStackedChart`) → per-tab renderers
 → exports/PDF report → boot.
