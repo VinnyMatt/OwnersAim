@@ -2702,7 +2702,7 @@ function openEventForm(templateKey, existing) {
   save.addEventListener("click", () => {
     const p = {};
     for (const [key, { inp, f }] of Object.entries(inputs)) {
-      if (f.type === "text" || f.type === "select" || f.type === "person" || f.type === "income" || f.type === "liability" || f.type === "business" || f.type === "btlOwner" || f.type === "btlDivTo" || (f.type || "").startsWith("asset")) p[key] = inp.value;
+      if (f.type === "text" || f.type === "select" || f.type === "person" || f.type === "income" || f.type === "liability" || f.type === "business" || f.type === "btlOwner" || f.type === "btlDivTo" || f.type === "drawSource" || (f.type || "").startsWith("asset")) p[key] = inp.value;
       else p[key] = parseFloat(inp.value) || 0;
     }
     if (existing) { existing.params = p; existing.name = nameField.value || tmpl.name; existing.template = templateKey; }
