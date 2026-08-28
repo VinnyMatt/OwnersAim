@@ -1140,6 +1140,7 @@ function runProjection(d, events) {
   const alive = {}; d.people.forEach((p) => (alive[p.id] = true));
   const btlState = {}; // buy-to-let lifecycle per event id
   const accessedPension = {}; // person id → true once taxable pension withdrawals begin (MPAA trigger)
+  const recycleHist = {};     // person id → per-year {tfc, extra, expected} for the tax-free-cash recycling check
   const retAge = (p) => mods.retirementAge[p.id] != null ? mods.retirementAge[p.id] : p.retirementAge;
   const spTL = (i) => Math.max(0.025, inflationFor(i), wageGrowthFor(i)); // triple-lock proxy
 
@@ -1151,6 +1152,8 @@ function runProjection(d, events) {
 
     const assetOut = {}; // money leaving each asset this year (withdrawals + sales) — feeds the Assets tab
     const takeFrom = (id, amt) => { if (amt > 0.5) assetOut[id] = (assetOut[id] || 0) + amt; };
+    const tfcByPerson = {};          // tax-free cash received this year (25% slice of pension draws)
+    const pensionExtraByPerson = {}; // contributions above the established pattern (events + surplus plan)
 
     // deaths this year
     for (const [pid, dy] of Object.entries(mods.deathYear)) {
@@ -1438,7 +1441,9 @@ function runProjection(d, events) {
       const ownerAge = owner ? ageIn(owner, i) : 99;
       const contribEnd = a.contributionEndAge != null ? a.contributionEndAge : (owner ? retAge(owner) - 1 : 0);
       if (a.annualContribution && owner && alive[owner.id] && ownerAge <= contribEnd) member += a.annualContribution * infl;
-      for (const xp of mods.extraPension) if (xp.assetId === a.id && i >= xp.yearFrom && i <= xp.yearTo) member += xp.annualToday * infl;
+      let extraEvt = 0;
+      for (const xp of mods.extraPension) if (xp.assetId === a.id && i >= xp.yearFrom && i <= xp.yearTo) extraEvt += xp.annualToday * infl;
+      member += extraEvt;
 
       if (member || employer) {
         contribByAsset[a.id] = (contribByAsset[a.id] || 0) + member + employer;
@@ -1447,6 +1452,7 @@ function runProjection(d, events) {
         pensionByPerson[pid] = pensionByPerson[pid] || { member: 0, employer: 0 };
         pensionByPerson[pid].member += member;
         pensionByPerson[pid].employer += employer;
+        if (extraEvt) pensionExtraByPerson[pid] = (pensionExtraByPerson[pid] || 0) + extraEvt;
         const pp = perPerson[a.ownerId];
         if (pp) {
           if (a.salarySacrifice && linkedAmt > 0) {
@@ -1615,6 +1621,7 @@ function runProjection(d, events) {
           withdrawalTax += delta; taxTotal += delta;
           flow += amt - delta;
           accessedPension[owner.id] = true; // flexible access triggers the MPAA
+          tfcByPerson[owner.id] = (tfcByPerson[owner.id] || 0) + amt * tf;
         } else if (a.type === "gia") {
           const gainFrac = a.bal > 0 ? Math.max(0, (a.bal - a.basis) / a.bal) : 0;
           const gain = amt * gainFrac;
@@ -1667,6 +1674,7 @@ function runProjection(d, events) {
               withdrawalTax += tax2; taxTotal += tax2;
               a.bal -= gross; need -= gross - tax2;
               if (owner) accessedPension[owner.id] = true; // flexible access triggers the MPAA
+              if (owner) tfcByPerson[owner.id] = (tfcByPerson[owner.id] || 0) + gross * tf;
               takeFrom(a.id, gross);
               withdrawals.push({ name: a.name, amount: gross, type: typ });
             } else {
@@ -1732,6 +1740,7 @@ function runProjection(d, events) {
               surplusUses.push({ name: a.name + " (" + fmtGBP(gross) + " incl. tax relief)", amount: amt });
               pensionByPerson[pid] = pensionByPerson[pid] || { member: 0, employer: 0 };
               pensionByPerson[pid].member += gross;
+              pensionExtraByPerson[pid] = (pensionExtraByPerson[pid] || 0) + gross;
               continue;
             }
             a.bal += amt; if (a.type === "gia") a.basis += amt;
@@ -1808,6 +1817,36 @@ function runProjection(d, events) {
       if (pc.member > Math.max(earnings, PEN.reliefEarningsFloor) + 0.5) {
         pensionWarnings.push({ pid: p.id, sev: "red", type: "earnings",
           text: nm + ": personal contributions of " + fmtGBP(pc.member) + " exceed relevant earnings (" + fmtGBP(earnings) + ") — tax relief is only available up to earnings (or £3,600 if higher)." });
+      }
+    }
+
+    // ── tax-free cash recycling check (HMRC PTM133810, approximated on a rolling window) ──
+    // Flags when tax-free cash above the £7,500 threshold lands within the five-tax-year
+    // window of pension contributions rising materially above the established pattern.
+    // Pre-planning is HMRC's final condition and cannot be modelled — these are risk warnings.
+    const REC = TAX.pensions.recycling || { tfcThreshold12m: 7500, contribUpliftPct: 0.3, windowYearsEachSide: 2 };
+    for (const p of d.people) {
+      if (!alive[p.id]) continue;
+      const h = recycleHist[p.id] = recycleHist[p.id] || [];
+      const pc2 = pensionByPerson[p.id] || { member: 0, employer: 0 };
+      const extraNow = pensionExtraByPerson[p.id] || 0;
+      h[i] = { tfc: tfcByPerson[p.id] || 0, extra: extraNow, expected: Math.max(0, pc2.member + pc2.employer - extraNow) };
+      let tfcWin = 0, extraWin = 0, expWin = 0, overThreshold = false;
+      for (let y = Math.max(0, i - REC.windowYearsEachSide); y <= i; y++) {
+        const e = h[y] || { tfc: 0, extra: 0, expected: 0 };
+        tfcWin += e.tfc; extraWin += e.extra; expWin += e.expected;
+        if (e.tfc > REC.tfcThreshold12m) overThreshold = true;
+      }
+      if (!overThreshold || extraWin <= 0.5) continue;
+      const cumTest = extraWin > REC.contribUpliftPct * tfcWin;              // increases exceed 30% of the lump sum
+      const sigTest = extraWin > REC.contribUpliftPct * Math.max(expWin, 1); // significantly above the established pattern
+      const nm2 = p.name.split(" ")[0];
+      if (cumTest && sigTest) {
+        pensionWarnings.push({ pid: p.id, sev: "red", type: "recycle",
+          text: nm2 + ": risk of tax-free cash recycling — " + fmtGBP(tfcWin) + " of tax-free cash and " + fmtGBP(extraWin) + " of increased pension contributions fall within HMRC's five-tax-year window, exceeding both 30% tests. If HMRC judged the increases pre-planned, the lump sum could be treated as an unauthorised payment and taxed at up to 55%. Take advice before pairing tax-free cash with higher contributions." });
+      } else if (extraWin > 0.8 * REC.contribUpliftPct * tfcWin) {
+        pensionWarnings.push({ pid: p.id, sev: "amber", type: "recycle-close",
+          text: nm2 + ": pension contributions have risen close to the time tax-free cash was taken (" + fmtGBP(extraWin) + " of increases against " + fmtGBP(tfcWin) + " of tax-free cash within five tax years). This is near HMRC's recycling limit — increases staying under 30% of the lump sum keep it clearly outside the rule." });
       }
     }
 

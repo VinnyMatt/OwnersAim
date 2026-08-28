@@ -57,6 +57,12 @@
     "taperedMinimum": 10000,
     "mpaa": 10000,
     "reliefEarningsFloor": 3600,
+    "recycling": {
+      "_note": "PTM133810: tax-free cash recycling. Lump sum(s) within 12 months over the threshold + contribution increases over the five-tax-year window exceeding upliftPct of the lump sum (and significantly above the established pattern) risk an unauthorised-payment charge up to 55%. Pre-planning is HMRC's final test and cannot be modelled — the engine warns on the numeric conditions only.",
+      "tfcThreshold12m": 7500,
+      "contribUpliftPct": 0.30,
+      "windowYearsEachSide": 2
+    },
     "lumpSumAllowance": 268275,
     "taxFreeProportion": 0.25,
     "normalMinimumPensionAge": 57,

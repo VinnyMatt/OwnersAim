@@ -110,10 +110,18 @@ the PDF report. Rebuild only when the underlying facts or tax rules change.
   18%/24%; pension withdrawals are 25% tax-free with the rest taxed as income at the
   owner's computed marginal position (drawdown, no annuity modelling).
 - Planned-drawdown what-ifs always take the 25%-tax-free/75%-taxable blend (a
-  tax-free-cash-only or crystallise-in-slices strategy is not distinguishable), start the
-  MPAA once taxable pension income is drawn, and are not checked against pension-recycling
-  rules. Draws land after asset growth for the year, and HICBC/ANI is assessed before them
-  (same as shortfall-funded withdrawals).
+  tax-free-cash-only or crystallise-in-slices strategy is not distinguishable) and start
+  the MPAA once taxable pension income is drawn. Draws land after asset growth for the
+  year, and HICBC/ANI is assessed before them (same as shortfall-funded withdrawals).
+- Tax-free cash recycling (PTM133810) is warned on, not charged: the engine flags a
+  person whose tax-free cash exceeds £7,500 in a year while pension contributions rise
+  above the established pattern (surplus-plan pension payments and "raise pension saving"
+  events count as increases; salary-linked and pre-existing planned contributions are the
+  pattern), with both 30% tests applied over a rolling window (the year and the two
+  before, approximating HMRC's five-tax-year window; the 12-month lump-sum test is
+  applied at tax-year granularity). Pre-planning — HMRC's decisive condition — cannot
+  be modelled, so breaches are risk warnings, and no unauthorised-payment charge is
+  deducted in the projection.
 - Shortfalls are funded in the assumptions' withdrawal order; surpluses top up the cash
   buffer then fill ISA (respecting the annual allowance) then GIA — or follow the user's
   percentage surplus plan (Assumptions tab), whose destinations can include pensions
