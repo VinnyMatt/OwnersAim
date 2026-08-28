@@ -2308,7 +2308,12 @@ function cashflowSeries(rows) {
     id: kind, name, slot,
     values: rows.map((r) => sum(r.incomeItems.filter((x) => (x.kind === kind) || (kind === "other" && !INCOME_KIND_META.some(([k2]) => k2 !== "other" && k2 === x.kind))).map((x) => x.amount))),
   }));
-  series.push({ id: "wd", name: "Withdrawals from savings", slot: 2, values: rows.map((r) => sum(r.withdrawals.map((w) => w.amount))) });
+  // pension drawdown sits next to the State Pension in the stack, same hue family, lighter shade
+  const spIx = series.findIndex((s) => s.id === "statePension");
+  series.splice(spIx + 1, 0, { id: "wdpen", name: "Private pension withdrawals", slot: 3, opacity: 0.55,
+    values: rows.map((r) => sum(r.withdrawals.filter((w) => w.type === "pension").map((w) => w.amount))) });
+  series.push({ id: "wd", name: "Withdrawals from savings", slot: 2,
+    values: rows.map((r) => sum(r.withdrawals.filter((w) => w.type !== "pension").map((w) => w.amount))) });
   series.push({ id: "lump", name: "One-off receipts", slot: 4, values: rows.map((r) => r.lumpIn) });
   return series.filter((s) => s.values.some((v) => v > 0.5));
 }

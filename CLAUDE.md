@@ -20,6 +20,10 @@ still stays uncommitted).
   templates/plan-template.html    ← THE product: ~3.5k lines, all CSS/JS inline
   templates/client-data.template.json  ← documented data schema (_-prefixed keys are stripped)
   scripts/build_plan.py           ← injects client JSON + tax JSON into the template
+  scripts/tax_check.js            ← headless tax-efficiency checker: ranks all 24
+                                    withdrawal orders by shortfall → net legacy after
+                                    IHT → lifetime tax. RUN IT AFTER EVERY NEW BUILD
+                                    (SKILL.md step 5) and apply the winning order.
 reference/
   uk-tax-data.json                ← machine-readable tax rules THE ENGINE CALCULATES WITH
   uk-tax-legislation.md           ← same figures, human-readable, with gov.uk sources

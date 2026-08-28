@@ -63,7 +63,19 @@ lifetime cash-flow plan** for a client. The output is a single local HTML file b
 4. **Sanity-check the output**: reopen the numbers — does year-1 tax look right for the
    salary? Does retirement income switch on at the right age? If anything looks wrong,
    fix the data or report the discrepancy honestly.
-5. **Hand over**: tell the user where the file is, that it opens in any browser, that
+5. **Run the tax-efficiency check (always, without being asked)**:
+   `node .claude/skills/financial-plan/scripts/tax_check.js clients/<name>/plan.html`
+   (needs playwright-core — set `PLAYWRIGHT_CORE_DIR` to a directory whose
+   node_modules contains it — and Chromium via `CHROME_PATH`, default
+   `/opt/pw-browsers/chromium`). It re-runs the plan's own engine under all 24
+   withdrawal-order strategies and ranks them by funding shortfall, then net legacy
+   after IHT, then lifetime tax. If a different order wins by a non-marginal amount,
+   apply it to `assumptions.withdrawalOrder` in the client data file, rebuild, and
+   tell the user what you changed and what it saves. Relay the script's advisory
+   notes (e.g. unused personal allowances, pensions sitting in a taxable estate)
+   as planning points — they are ideas to model as what-if events, not automatic
+   changes.
+6. **Hand over**: tell the user where the file is, that it opens in any browser, that
    "PDF report" prints all charts/tables, and that "Save data" exports edits made live
    (assumption tweaks, what-if events) back to JSON — offer to merge a saved JSON back
    into `client-data.json` when they return.
