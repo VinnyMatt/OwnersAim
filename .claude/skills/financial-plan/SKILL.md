@@ -91,7 +91,9 @@ you'd lose their saved events and overrides.
 Live in the browser: change global/per-year inflation, wage growth and per-asset growth;
 add/edit/toggle what-if life events (retirement age, salary changes, career breaks, property
 purchase/sale, windfalls, school fees, gifts, death of a partner, redundancy, care costs,
-fully custom events, mortgage overpayments); use the Debts tab's overpayment calculator
+fully custom events, mortgage overpayments, planned drawdowns — a fixed annual amount
+from a chosen pot or from every private pension, from a chosen age, for N years or until
+empty); use the Debts tab's overpayment calculator
 and per-mortgage offset-savings option; click any cash-flow year for its full breakdown;
 view year-by-year inheritance-tax exposure (Inheritance tax tab); export CSV/JSON; print
 the PDF report. Rebuild only when the underlying facts or tax rules change.
@@ -107,6 +109,11 @@ the PDF report. Rebuild only when the underlying facts or tax rules change.
   withdrawals realise a proportionate gain taxed through the CGT annual exempt amount at
   18%/24%; pension withdrawals are 25% tax-free with the rest taxed as income at the
   owner's computed marginal position (drawdown, no annuity modelling).
+- Planned-drawdown what-ifs always take the 25%-tax-free/75%-taxable blend (a
+  tax-free-cash-only or crystallise-in-slices strategy is not distinguishable), start the
+  MPAA once taxable pension income is drawn, and are not checked against pension-recycling
+  rules. Draws land after asset growth for the year, and HICBC/ANI is assessed before them
+  (same as shortfall-funded withdrawals).
 - Shortfalls are funded in the assumptions' withdrawal order; surpluses top up the cash
   buffer then fill ISA (respecting the annual allowance) then GIA — or follow the user's
   percentage surplus plan (Assumptions tab), whose destinations can include pensions

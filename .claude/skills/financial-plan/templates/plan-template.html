@@ -838,6 +838,18 @@ const EVENT_TEMPLATES = {
     ],
     describe: (p, d) => `${fmtGBP(p.annual)}/yr extra into ${assetName(d, p.assetId)}, age ${p.fromAge}–${p.toAge}`,
   },
+  plannedDraw: {
+    name: "Planned withdrawals from a pot", group: "Retirement & income",
+    desc: "Draw a set amount each year from a chosen pot — or every private pension at once — from a chosen age. Runs until the pot is empty, or for a set number of years. Taxed by wrapper: pension withdrawals are 25% tax-free with the rest taxed as income (and only possible from age 57); ISA and cash draws are tax-free; GIA sales realise gains through capital gains tax.",
+    fields: [
+      { key: "assetId", label: "Draw from", type: "drawSource" },
+      { key: "fromAge", label: "From owner's age", type: "number", def: 57 },
+      { key: "years", label: "For how many years (0 = until empty)", type: "number", def: 0 },
+      { key: "annual", label: "Amount per year (£ gross)", type: "number", def: 12500 },
+      { key: "inflate", label: "Increase with inflation?", type: "select", options: ["no", "yes"], def: "no" },
+    ],
+    describe: (p, d) => `${fmtGBP(p.annual)}/yr from ${p.assetId === "type:pension" ? "each private pension" : assetName(d, p.assetId)} from age ${p.fromAge}${p.years > 0 ? " for " + p.years + " yrs" : " until empty"}`,
+  },
   mortgageOverpay: {
     name: "Mortgage overpayment", group: "Property & purchases",
     desc: "Pay extra each month off a debt and clear it sooner.",
@@ -1018,6 +1030,7 @@ function compileEvents(d, events) {
     debtOverpay: [],                      // {liabilityId, fromYear, annual}
     sellBusiness: [],                     // {bizId, yearIdx, price, badr}
     btl: [],                              // buy-to-let configs (see buyToLet template)
+    plannedDraws: [],                     // {assetSel, fromAge, years, annual, inflate}
   };
   const yearOfAge = (personId, age) => {
     const p = d.people.find((x) => x.id === personId);
@@ -1041,6 +1054,7 @@ function compileEvents(d, events) {
         }
         break;
       }
+      case "plannedDraw": m.plannedDraws.push({ assetSel: p.assetId, fromAge: p.fromAge || 57, years: p.years || 0, annual: p.annual || 0, inflate: p.inflate === "yes" }); break;
       case "salaryChange": m.incomeSets.push({ incomeId: p.incomeId, fromYear: ownerYear(p.incomeId, p.fromAge), annualToday: p.newAnnual }); break;
       case "careerBreak": m.incomeStops.push({ incomeId: p.incomeId, fromYear: ownerYear(p.incomeId, p.fromAge), toYear: ownerYear(p.incomeId, p.fromAge) + p.years - 1 }); break;
       case "newPension": {
@@ -1574,6 +1588,55 @@ function runProjection(d, events) {
     // ── withdrawals (deficit) or surplus allocation ──
     let withdrawals = [], withdrawalTax = 0, cgtPaid = 0, shortfall = 0, surplusTotal = 0;
     const surplusUses = [], extraDebtPay = {};
+
+    // ── planned drawdowns (what-if): fixed annual draws from chosen pots ──
+    // Runs before the deficit/surplus balance so the net proceeds join household
+    // cash flow: they cover spending first, and anything spare follows the surplus rules.
+    for (const pd of mods.plannedDraws) {
+      const targets = pd.assetSel === "type:pension"
+        ? assets.filter((a) => a.type === "pension" && !a.isBusiness)
+        : assets.filter((a) => a.id === pd.assetSel);
+      for (const a of targets) {
+        if (a.bal <= 0.5 || a.sold) continue;
+        const owner = a.ownerId === "joint" ? d.people.find((x) => alive[x.id]) : d.people.find((x) => x.id === a.ownerId);
+        if (!owner || !alive[owner.id]) continue;
+        const age = ageIn(owner, i);
+        if (age < pd.fromAge || (pd.years > 0 && age >= pd.fromAge + pd.years)) continue;
+        if (a.type === "pension" && age < (TAX.pensions.normalMinimumPensionAge || 57)) continue;
+        const amt = Math.min(a.bal, (pd.annual || 0) * (pd.inflate ? infl : 1));
+        if (amt <= 0.5) continue;
+        if (a.type === "pension") {
+          const pp = perPerson[owner.id];
+          const tf = TAX.pensions.taxFreeProportion || 0.25;
+          const base = taxCore(pp);
+          pp.nonSavings += amt * (1 - tf);
+          pp.tax = taxCore(pp);
+          const delta = (pp.tax.incomeTax + pp.tax.dividendTax) - (base.incomeTax + base.dividendTax);
+          withdrawalTax += delta; taxTotal += delta;
+          flow += amt - delta;
+          accessedPension[owner.id] = true; // flexible access triggers the MPAA
+        } else if (a.type === "gia") {
+          const gainFrac = a.bal > 0 ? Math.max(0, (a.bal - a.basis) / a.bal) : 0;
+          const gain = amt * gainFrac;
+          let cgt = 0;
+          for (const [pid, share] of shareOwners(d, a.ownerId, alive)) {
+            const pp = perPerson[pid];
+            const taxableGain = Math.max(0, gain * share - TAX.capitalGains.annualExemptAmount);
+            const rate = pp && pp.tax.band !== "basic" ? TAX.capitalGains.rates.higher : TAX.capitalGains.rates.basic;
+            cgt += taxableGain * rate;
+          }
+          a.basis = Math.max(0, a.basis * (1 - amt / Math.max(a.bal, 1)));
+          cgtPaid += cgt; taxTotal += cgt;
+          flow += amt - cgt;
+        } else {
+          flow += amt; // ISA and cash draws are tax-free
+        }
+        a.bal -= amt;
+        takeFrom(a.id, amt);
+        withdrawals.push({ name: a.name, amount: amt, type: a.type, planned: true });
+      }
+    }
+
     if (flow < -0.5) {
       let need = -flow;
       const order = d.assumptions.withdrawalOrder || ["cash", "gia", "isa", "pension"];
@@ -2564,6 +2627,11 @@ function openEventForm(templateKey, existing) {
     } else if (f.type === "liability") {
       inp = el("select");
       (d.liabilities || []).forEach((l) => inp.append(el("option", { value: l.id }, l.name)));
+      if (cur) inp.value = cur;
+    } else if (f.type === "drawSource") {
+      inp = el("select");
+      if (d.assets.some((a) => a.type === "pension")) inp.append(el("option", { value: "type:pension" }, "Each private pension (one draw per pot)"));
+      d.assets.filter((a) => ["pension", "isa", "gia", "cash"].includes(a.type)).forEach((a) => inp.append(el("option", { value: a.id }, a.name)));
       if (cur) inp.value = cur;
     } else if (f.type && f.type.startsWith("asset")) {
       const wantType = f.type.split(":")[1];
