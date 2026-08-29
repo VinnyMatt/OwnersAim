@@ -379,7 +379,7 @@ footer.privacy {
     <div class="tiles" id="ov-tiles"></div>
     <div class="card">
       <h2>Net worth over your lifetime</h2>
-      <p class="cardnote">Assets stacked by holding, net worth after liabilities shown as the line. Hover for values; the dashed line is the baseline when what-if events are on.</p>
+      <p class="cardnote">Wealth stacked by category — savings, investments, pension, property, business — with net worth after liabilities as the line. Hover for values; the dashed line is the baseline when what-if events are on. The Assets tab breaks any category down to the individual account.</p>
       <div class="chartbox" id="ov-chart"></div>
     </div>
     <div class="card" id="ov-summary"></div>
@@ -397,7 +397,7 @@ footer.privacy {
   <section class="tabpane" id="pane-networth">
     <div class="card">
       <h2>Net worth projection</h2>
-      <p class="cardnote">Each asset grows under its own assumption, net of its charges — adjust the rates below and every projection updates.</p>
+      <p class="cardnote">Wealth stacked by category — savings, investments, pension, property, business. Each underlying asset still grows under its own assumption, net of its charges — adjust the rates below and every projection updates; the Assets tab follows any single account.</p>
       <div class="chartbox" id="nw-chart"></div>
     </div>
     <div class="card">
@@ -2230,9 +2230,43 @@ function assetSeries(rows) {
   }
   meta.sort((a, b) => a.slot - b.slot || a.shade - b.shade || a.name.localeCompare(b.name));
   return meta.map((m) => ({
-    id: m.id, name: m.name, slot: m.slot, opacity: m.opacity,
+    id: m.id, name: m.name, type: m.type, slot: m.slot, opacity: m.opacity,
     values: rows.map((r) => r.assets[m.id] || 0),
   }));
+}
+
+/* Net worth is stacked by CATEGORY, not by individual asset — one colour per
+   class so the shape of the wealth reads at a glance (per-asset detail lives
+   on the Assets tab). Cash ISAs count as savings; S&S ISAs as investments. */
+const NW_CATEGORIES = [
+  { name: "Savings", slot: 1 },
+  { name: "Investments", slot: 2 },
+  { name: "Pension", slot: 3 },
+  { name: "Property", slot: 4 },
+  { name: "Business", slot: 7 },
+];
+function assetCategoryOf(id, type) {
+  if (type === "business") return "Business";
+  if (type === "property") return "Property";
+  if (type === "pension") return "Pension";
+  if (type === "cash") return "Savings";
+  if (type === "isa") {
+    const a = state.data.assets.find((x) => x.id === id);
+    const al = a && a.allocation;
+    if (al && (al.cash || 0) >= 99) return "Savings";
+    return "Investments";
+  }
+  return "Investments"; // gia and anything else
+}
+function assetCategorySeries(rows) {
+  const sums = {};
+  for (const s of assetSeries(rows)) {
+    const cat = assetCategoryOf(s.id, s.type);
+    if (!sums[cat]) sums[cat] = rows.map(() => 0);
+    s.values.forEach((v, i) => (sums[cat][i] += v));
+  }
+  return NW_CATEGORIES.filter((c) => sums[c.name] && sums[c.name].some((v) => v > 0.5))
+    .map((c) => ({ id: "cat-" + c.name, name: c.name, slot: c.slot, values: sums[c.name] }));
 }
 
 function renderNetWorthChart(container, height) {
@@ -2241,7 +2275,7 @@ function renderNetWorthChart(container, height) {
   if (rows !== base) overlays.push({ name: "Baseline net worth", values: base.map((r) => r.netWorth), dashed: true, legendColor: "var(--text-muted)" });
   renderStackedChart(container, {
     mode: "bar",
-    series: assetSeries(rows),
+    series: assetCategorySeries(rows),
     labels: rows.map((r) => String(r.year)),
     overlays,
     height: height || 360,
