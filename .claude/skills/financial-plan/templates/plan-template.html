@@ -191,6 +191,9 @@ table.data input[type=number] {
 .chart-legend { display: flex; flex-wrap: wrap; gap: 7px 18px; margin: 14px 2px 0;
   font-family: var(--font-mono); font-size: 11px; letter-spacing: .04em; text-transform: uppercase; color: var(--text-secondary); }
 .chart-legend .item { display: inline-flex; align-items: center; }
+.chart-legend .item.toggle { cursor: pointer; user-select: none; padding: 2px 4px; margin: -2px -4px; transition: color .12s, opacity .12s; }
+.chart-legend .item.toggle:hover { color: var(--text-primary); }
+.chart-legend .item.toggle.off { opacity: .38; text-decoration: line-through; text-decoration-thickness: 1px; }
 svg .gridline { stroke: var(--grid); stroke-width: 1; }
 svg .axisline { stroke: var(--baseline); stroke-width: 1; }
 svg .ticktext { fill: var(--text-muted); font-size: 11px; font-family: var(--font-mono); }
@@ -379,7 +382,7 @@ footer.privacy {
     <div class="tiles" id="ov-tiles"></div>
     <div class="card">
       <h2>Net worth over your lifetime</h2>
-      <p class="cardnote">Wealth stacked by category — savings, investments, pension, property, business — with net worth after liabilities as the line. Hover for values; the dashed line is the baseline when what-if events are on. The Assets tab breaks any category down to the individual account.</p>
+      <p class="cardnote">Wealth stacked by category — savings, investments, pension, property, business — with net worth after liabilities as the line. Hover for values; click any legend entry to add or remove that layer; the dashed line is the baseline when what-if events are on. The Assets tab breaks any category down to the individual account.</p>
       <div class="chartbox" id="ov-chart"></div>
     </div>
     <div class="card" id="ov-summary"></div>
@@ -397,7 +400,7 @@ footer.privacy {
   <section class="tabpane" id="pane-networth">
     <div class="card">
       <h2>Net worth projection</h2>
-      <p class="cardnote">Wealth stacked by category — savings, investments, pension, property, business. Each underlying asset still grows under its own assumption, net of its charges — adjust the rates below and every projection updates; the Assets tab follows any single account.</p>
+      <p class="cardnote">Wealth stacked by category — savings, investments, pension, property, business. Click any legend entry to add or remove that layer and build the picture up piece by piece. Each underlying asset still grows under its own assumption, net of its charges — adjust the rates below and every projection updates; the Assets tab follows any single account.</p>
       <div class="chartbox" id="nw-chart"></div>
     </div>
     <div class="card">
@@ -477,7 +480,7 @@ footer.privacy {
   <section class="tabpane" id="pane-cashflow">
     <div class="card">
       <h2>Lifetime cash flow</h2>
-      <p class="cardnote">The bars stack every source of money coming in each year; the line shows total outgoings — spending, tax, debt payments and saving. Red markers highlight any year where spending could not be fully met. <strong>Select any year</strong> for its full breakdown.</p>
+      <p class="cardnote">The bars stack every source of money coming in each year; the line shows total outgoings — spending, tax, debt payments and saving. Red markers highlight any year where spending could not be fully met. <strong>Select any year</strong> for its full breakdown, and <strong>click any legend entry</strong> to build the picture up in layers — start with just the outgoings line, add employment, then pensions, one element at a time.</p>
       <div class="chartbox" id="cf-chart"></div>
     </div>
     <div class="card">
@@ -1964,7 +1967,17 @@ function renderStackedChart(container, cfg) {
   const padL = 58, padR = 14, padT = 14, padB = 34;
   const iw = W - padL - padR, ih = H - padT - padB;
   const nPts = cfg.labels.length;
-  const series = cfg.series.filter((s) => s.values.some((v) => v > 0.5));
+  // Voyant-style layering: every legend entry toggles its layer on/off, so a
+  // chart can be stripped back and rebuilt element by element in conversation.
+  const layeringOn = cfg.layering !== false; // print/report charts always render complete
+  const layerKey = cfg.layerKey || container.id || "chart";
+  state.chartLayers = state.chartLayers || {};
+  const hidden = layeringOn ? (state.chartLayers[layerKey] = state.chartLayers[layerKey] || []) : [];
+  const sKey = (s) => "s:" + s.id, oKey = (o) => "ov:" + o.name;
+  const allSeries = cfg.series.filter((s) => s.values.some((v) => v > 0.5));
+  const allOverlays = cfg.overlays || [];
+  const series = allSeries.filter((s) => !hidden.includes(sKey(s)));
+  const overlays = allOverlays.filter((o) => !hidden.includes(oKey(o)));
   const stackTops = [];
   let maxV = 0;
   for (let i = 0; i < nPts; i++) {
@@ -1973,7 +1986,7 @@ function renderStackedChart(container, cfg) {
     stackTops.push(acc);
     maxV = Math.max(maxV, acc);
   }
-  for (const o of cfg.overlays || []) maxV = Math.max(maxV, ...o.values);
+  for (const o of overlays) maxV = Math.max(maxV, ...o.values);
   if (maxV <= 0) maxV = 1;
   const ticks = niceTicks(maxV, 4);
   maxV = ticks[ticks.length - 1];
@@ -2050,7 +2063,7 @@ function renderStackedChart(container, cfg) {
   }
 
   // overlays
-  for (const o of cfg.overlays || []) {
+  for (const o of overlays) {
     let dd = "";
     for (let i = 0; i < o.values.length; i++) {
       const x = cfg.mode === "bar" ? xBar(i) + bandW / 2 : xAt(i);
@@ -2111,7 +2124,7 @@ function renderStackedChart(container, cfg) {
       ...[...series].reverse()
         .filter((s) => s.values[i] > 0.5)
         .map((s) => ({ name: s.name, value: fmtCompact(s.values[i]), slot: s.slot, opacity: s.opacity })),
-      ...(cfg.overlays || []).map((o) => ({ name: o.name, value: fmtCompact(o.values[i]) })),
+      ...overlays.map((o) => ({ name: o.name, value: fmtCompact(o.values[i]) })),
     ];
     showTooltip(evt.clientX, evt.clientY, cfg.tooltipTitle ? cfg.tooltipTitle(i) : cfg.labels[i], rows,
       !cfg.tooltipRows && cfg.totalLabel ? { name: cfg.totalLabel, value: fmtCompact(stackTops[i]) } : null);
@@ -2121,18 +2134,27 @@ function renderStackedChart(container, cfg) {
 
   container.append(svg);
 
-  // legend
-  if (series.length + (cfg.overlays || []).length > 1) {
+  // legend — every entry is a toggle: click to remove a layer, click again to add it back
+  if (allSeries.length + allOverlays.length > 1) {
     const legend = el("div", { class: "chart-legend" });
-    for (const s of series) {
-      const item = el("span", { class: "item" });
-      item.append(el("span", { class: "swatch", style: `background:var(--s${s.slot});opacity:${s.opacity == null ? 1 : s.opacity}` }), s.name);
+    const toggle = (key) => {
+      const ix = hidden.indexOf(key);
+      if (ix >= 0) hidden.splice(ix, 1); else hidden.push(key);
+      renderAll();
+    };
+    const addItem = (key, keyEl, name) => {
+      if (!layeringOn) { const item = el("span", { class: "item" }); item.append(keyEl, name); legend.append(item); return; }
+      const off = hidden.includes(key);
+      const item = el("span", { class: "item toggle" + (off ? " off" : ""), title: off ? "Click to add this layer" : "Click to hide this layer" });
+      item.append(keyEl, name);
+      item.addEventListener("click", () => toggle(key));
       legend.append(item);
+    };
+    for (const s of allSeries) {
+      addItem(sKey(s), el("span", { class: "swatch", style: `background:var(--s${s.slot});opacity:${s.opacity == null ? 1 : s.opacity}` }), s.name);
     }
-    for (const o of cfg.overlays || []) {
-      const item = el("span", { class: "item" });
-      item.append(el("span", { class: "linekey", style: `background:${o.legendColor || "var(--text-primary)"};${o.dashed ? "opacity:.55" : ""}` }), o.name);
-      legend.append(item);
+    for (const o of allOverlays) {
+      addItem(oKey(o), el("span", { class: "linekey", style: `background:${o.legendColor || "var(--text-primary)"};${o.dashed ? "opacity:.55" : ""}` }), o.name);
     }
     if ((cfg.markers || []).length) {
       const item = el("span", { class: "item" });
@@ -2374,6 +2396,7 @@ function renderTax() {
     ];
     renderStackedChart(chartBox, {
       mode: "bar",
+      layerKey: "tax-" + person.id,
       series: seriesDefs.map((s, ix) => ({ id: "t" + ix, name: s.name, slot: s.slot, values: rows.map(s.key) })),
       labels: rows.map((r) => String(r.year)),
       height: 240,
@@ -4163,10 +4186,10 @@ function buildAndPrintReport() {
   p1.append(el("h2", null, "Net worth over your lifetime"));
   const nwBox = el("div", { class: "chartbox" }); p1.append(nwBox);
   renderStackedChart(nwBox, {
-    mode: "bar", series: assetSeries(rows), labels: rows.map((r) => String(r.year)),
+    mode: "bar", series: assetCategorySeries(rows), labels: rows.map((r) => String(r.year)),
     overlays: [{ name: "Net worth (after debts)", values: rows.map((r) => r.netWorth) },
       ...(rows !== base ? [{ name: "Baseline (no what-if events)", values: base.map((r) => r.netWorth), dashed: true, legendColor: "var(--text-muted)" }] : [])],
-    height: 300, interactive: false,
+    height: 300, interactive: false, layering: false,
   });
 
   const p2 = page();
@@ -4174,6 +4197,7 @@ function buildAndPrintReport() {
   const cfBox = el("div", { class: "chartbox" }); p2.append(cfBox);
   renderStackedChart(cfBox, {
     mode: "bar", series: cashflowSeries(rows), labels: rows.map((r) => String(r.year)),
+    layering: false,
     overlays: [{ name: "Total outgoings", values: outflowValues(rows) }],
     markers: rows.map((r, i) => (r.shortfall > 0.5 ? { idx: i } : null)).filter(Boolean),
     height: 300, interactive: false,
