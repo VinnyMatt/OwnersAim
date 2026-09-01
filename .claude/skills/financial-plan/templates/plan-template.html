@@ -208,6 +208,8 @@ svg .stroke-s3 { stroke: var(--s3); } svg .stroke-s4 { stroke: var(--s4); }
 svg .stroke-s5 { stroke: var(--s5); } svg .stroke-s6 { stroke: var(--s6); }
 svg .stroke-s7 { stroke: var(--s7); } svg .stroke-s8 { stroke: var(--s8); }
 svg .shortfall-dot { fill: var(--critical); }
+svg .backbar { fill: var(--critical); fill-opacity: .3; }
+svg .backbar-cap { fill: var(--critical); fill-opacity: .95; }
 
 svg .col { transition: opacity .12s ease; }
 svg.hovering .col:not(.hot) { opacity: .35; }
@@ -480,7 +482,7 @@ footer.privacy {
   <section class="tabpane" id="pane-cashflow">
     <div class="card">
       <h2>Lifetime cash flow</h2>
-      <p class="cardnote">The bars stack every source of money coming in each year; the line shows total outgoings — spending, tax, debt payments and saving. Red markers highlight any year where spending could not be fully met. <strong>Select any year</strong> for its full breakdown, and <strong>click any legend entry</strong> to build the picture up in layers — start with just the outgoings line, add employment, then pensions, one element at a time.</p>
+      <p class="cardnote">The coloured bars stack every source of money coming in each year; the red bar behind them is total outgoings — spending, tax, debt payments and saving. Where the red rises above the stacked sources, spending could not be fully met — a shortfall. <strong>Hover any year</strong> for the full breakdown including its surplus or shortfall, <strong>select it</strong> for the detail drawer, and <strong>click any legend entry</strong> to build the picture up in layers — start with just the red outgoings bars, add employment, then pensions, one element at a time.</p>
       <div class="chartbox" id="cf-chart"></div>
     </div>
     <div class="card">
@@ -1920,22 +1922,26 @@ function recompute() {
 
 /* ═══════════════════════════ chart library ═══════════════════════════ */
 const tooltip = $("#tooltip");
-function showTooltip(x, y, title, rows, totalRow) {
+function showTooltip(x, y, title, rows, totalRow, afterRows) {
   tooltip.textContent = "";
   tooltip.append(el("div", { class: "tt-title" }, title));
-  for (const r of rows) {
+  const addRow = (r) => {
     const row = el("div", { class: "tt-row" + (r.em ? " tt-total" : "") });
     const nm = el("span", { class: "nm" });
     if (r.slot) nm.append(el("span", { class: "linekey", style: `background:var(--s${r.slot});opacity:${r.opacity == null ? 1 : r.opacity}` }));
+    else if (r.swatchColor) nm.append(el("span", { class: "linekey", style: `background:${r.swatchColor}` }));
     nm.append(document.createTextNode(r.name));
-    row.append(nm, el("span", { class: "val" }, r.value));
+    const val = el("span", { class: "val", style: r.color ? `color:${r.color}` : "" }, r.value);
+    row.append(nm, val);
     tooltip.append(row);
-  }
+  };
+  for (const r of rows) addRow(r);
   if (totalRow) {
     const row = el("div", { class: "tt-row tt-total" });
     row.append(el("span", { class: "nm" }, totalRow.name), el("span", { class: "val" }, totalRow.value));
     tooltip.append(row);
   }
+  for (const r of afterRows || []) addRow(r);
   tooltip.style.display = "block";
   const rect = tooltip.getBoundingClientRect();
   let left = x + 16, top = y + 14;
@@ -1973,11 +1979,14 @@ function renderStackedChart(container, cfg) {
   const layerKey = cfg.layerKey || container.id || "chart";
   state.chartLayers = state.chartLayers || {};
   const hidden = layeringOn ? (state.chartLayers[layerKey] = state.chartLayers[layerKey] || []) : [];
-  const sKey = (s) => "s:" + s.id, oKey = (o) => "ov:" + o.name;
+  const sKey = (s) => "s:" + s.id, oKey = (o) => "ov:" + o.name, bbKey = "bb:outflow";
   const allSeries = cfg.series.filter((s) => s.values.some((v) => v > 0.5));
   const allOverlays = cfg.overlays || [];
   const series = allSeries.filter((s) => !hidden.includes(sKey(s)));
   const overlays = allOverlays.filter((o) => !hidden.includes(oKey(o)));
+  // backBars: a red backdrop bar per year (total outgoings) drawn BEHIND the
+  // stack — where it rises above the stacked sources, spending is unmet.
+  const backBars = cfg.backBars && !hidden.includes(bbKey) ? cfg.backBars : null;
   const stackTops = [];
   let maxV = 0;
   for (let i = 0; i < nPts; i++) {
@@ -1987,6 +1996,7 @@ function renderStackedChart(container, cfg) {
     maxV = Math.max(maxV, acc);
   }
   for (const o of overlays) maxV = Math.max(maxV, ...o.values);
+  if (backBars) maxV = Math.max(maxV, ...backBars.values);
   if (maxV <= 0) maxV = 1;
   const ticks = niceTicks(maxV, 4);
   maxV = ticks[ticks.length - 1];
@@ -2037,6 +2047,12 @@ function renderStackedChart(container, cfg) {
       const bw = Math.min(24, Math.max(3, bandW - gap * 2));
       const bx = xBar(i) + (bandW - bw) / 2;
       const col = svgEl("g", { class: "col" });
+      if (backBars && backBars.values[i] > 0.5) {
+        const bv = backBars.values[i];
+        const by = yAt(bv), sh = Math.min(3, bandW * 0.18);
+        col.append(svgEl("rect", { x: bx - sh, y: by, width: bw + sh * 2, height: yAt(0) - by, class: "backbar" }));
+        col.append(svgEl("rect", { x: bx - sh, y: by, width: bw + sh * 2, height: 2.5, class: "backbar-cap" }));
+      }
       let first = true;
       for (const s of series) {
         const v = Math.max(0, s.values[i]);
@@ -2124,10 +2140,12 @@ function renderStackedChart(container, cfg) {
       ...[...series].reverse()
         .filter((s) => s.values[i] > 0.5)
         .map((s) => ({ name: s.name, value: fmtCompact(s.values[i]), slot: s.slot, opacity: s.opacity })),
+      ...(backBars ? [{ name: backBars.name, value: fmtCompact(backBars.values[i]), swatchColor: "var(--critical)" }] : []),
       ...overlays.map((o) => ({ name: o.name, value: fmtCompact(o.values[i]) })),
     ];
     showTooltip(evt.clientX, evt.clientY, cfg.tooltipTitle ? cfg.tooltipTitle(i) : cfg.labels[i], rows,
-      !cfg.tooltipRows && cfg.totalLabel ? { name: cfg.totalLabel, value: fmtCompact(stackTops[i]) } : null);
+      !cfg.tooltipRows && cfg.totalLabel ? { name: cfg.totalLabel, value: fmtCompact(stackTops[i]) } : null,
+      cfg.tooltipAfter ? cfg.tooltipAfter(i) : null);
   });
   hit.addEventListener("pointerleave", () => { cross.setAttribute("visibility", "hidden"); clearHotCol(); hideTooltip(); });
   if (cfg.onClickYear) hit.addEventListener("click", (evt) => cfg.onClickYear(idxFromEvent(evt)));
@@ -2135,7 +2153,7 @@ function renderStackedChart(container, cfg) {
   container.append(svg);
 
   // legend — every entry is a toggle: click to remove a layer, click again to add it back
-  if (allSeries.length + allOverlays.length > 1) {
+  if (allSeries.length + allOverlays.length + (cfg.backBars ? 1 : 0) > 1) {
     const legend = el("div", { class: "chart-legend" });
     const toggle = (key) => {
       const ix = hidden.indexOf(key);
@@ -2152,6 +2170,9 @@ function renderStackedChart(container, cfg) {
     };
     for (const s of allSeries) {
       addItem(sKey(s), el("span", { class: "swatch", style: `background:var(--s${s.slot});opacity:${s.opacity == null ? 1 : s.opacity}` }), s.name);
+    }
+    if (cfg.backBars) {
+      addItem(bbKey, el("span", { class: "swatch", style: "background:var(--critical);opacity:.75" }), cfg.backBars.name);
     }
     for (const o of allOverlays) {
       addItem(oKey(o), el("span", { class: "linekey", style: `background:${o.legendColor || "var(--text-primary)"};${o.dashed ? "opacity:.55" : ""}` }), o.name);
@@ -2498,12 +2519,18 @@ function renderCashflow() {
     mode: "bar",
     series: cashflowSeries(rows),
     labels: rows.map((r) => String(r.year)),
-    overlays: [{ name: "Total outgoings (spending, tax, debt & saving)", values: outflowValues(rows) }],
+    backBars: { name: "Total outgoings (spending, tax, debt & saving)", values: outflowValues(rows) },
     markers: rows.map((r, i) => (r.shortfall > 0.5 ? { idx: i } : null)).filter(Boolean),
     height: 360,
     selectedIdx: state.selectedYear,
     tooltipTitle: (i) => rows[i].label + " · " + agesLabel(rows[i]) + " · click for detail",
     totalLabel: "Total in",
+    tooltipAfter: (i) => {
+      const r = rows[i];
+      if (r.shortfall > 0.5) return [{ name: "Shortfall — spending unmet", value: "−" + fmtCompact(r.shortfall), color: "#F49C86", em: true }];
+      if (r.surplusSaved > 0.5) return [{ name: "Surplus — saved", value: "+" + fmtCompact(r.surplusSaved), color: "#8FD0B2", em: true }];
+      return [{ name: "Income and outgoings balanced", value: "±£0", em: true }];
+    },
     onClickYear: (i) => openYearDrawer(i),
   });
 
@@ -4198,7 +4225,7 @@ function buildAndPrintReport() {
   renderStackedChart(cfBox, {
     mode: "bar", series: cashflowSeries(rows), labels: rows.map((r) => String(r.year)),
     layering: false,
-    overlays: [{ name: "Total outgoings", values: outflowValues(rows) }],
+    backBars: { name: "Total outgoings", values: outflowValues(rows) },
     markers: rows.map((r, i) => (r.shortfall > 0.5 ? { idx: i } : null)).filter(Boolean),
     height: 300, interactive: false,
   });
